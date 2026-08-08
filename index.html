@@ -473,7 +473,7 @@ function renderSheet(w, cellsLocked, showAdd){
   const gkRows = w.rows.filter(r=>r.isGK);
   const fieldRows = w.rows.filter(r=>!r.isGK);
 
-  function rowHtml(r, label){
+  function rowHtml(r, num, icon){
     const st = paymentStatus(r);
     const complete = rowIsComplete(r);
     const needsAction = rowNeedsAction(r);
@@ -493,8 +493,8 @@ function renderSheet(w, cellsLocked, showAdd){
     }
 
     return `<tr class="${trClass}">
-      <td class="col-num sticky-col"><span class="rownum">${label}</span></td>
-      <td class="col-name sticky-col"><span class="rname">${escapeHtml(r.name)}</span></td>
+      <td class="col-num sticky-col"><span class="rownum">${num}.</span></td>
+      <td class="col-name sticky-col"><span class="rname">${icon} ${escapeHtml(r.name)}</span></td>
       <td class="col-ll"><button class="cell-btn ${r.arrived?'ll-on':''}" data-toggle-arrived="${r.rowId}" ${cellsLocked?'disabled':''}>${r.arrived?'✓':''}</button></td>
       <td class="col-gp"><button class="cell-btn ${r.won===true?'gp-win':r.won===false?'gp-lose':''}" data-cycle-won="${r.rowId}" ${cellsLocked||!r.arrived?'disabled':''}>${r.won===true?'G':r.won===false?'P':'—'}</button></td>
       <td class="col-pago"><span class="pago-val">${st.owed?fmtK(st.owed):'—'}</span></td>
@@ -518,12 +518,10 @@ function renderSheet(w, cellsLocked, showAdd){
     <tbody>`;
 
   if(gkRows.length>0){
-    html += `<tr class="section-row"><td colspan="8" class="sticky-col">🥅 Arqueros</td></tr>`;
-    gkRows.forEach(r=> html += rowHtml(r, '🥅'));
+    gkRows.forEach((r,i)=> html += rowHtml(r, i+1, '🥅'));
   }
   if(fieldRows.length>0){
-    html += `<tr class="section-row"><td colspan="8" class="sticky-col">⚽ Jugadores</td></tr>`;
-    fieldRows.forEach((r,i)=> html += rowHtml(r, i+1));
+    fieldRows.forEach((r,i)=> html += rowHtml(r, i+1, '⚽🏃🏻'));
   }
   if(w.rows.length===0){
     html += `<tr><td colspan="8" style="padding:18px; color:var(--chalk-dim); text-align:center;">Agrega jugadores abajo o desde "Plantel"</td></tr>`;
@@ -540,14 +538,6 @@ function renderSheet(w, cellsLocked, showAdd){
   }
   html += `</div>`;
 
-  if(showAdd){
-    html += `<div class="legend">
-      <span><i style="background:rgba(55,214,122,0.35)"></i>Completo</span>
-      <span><i style="background:rgba(255,201,77,0.35)"></i>Necesita acción</span>
-      <span>Toca <b style="color:var(--gold)">Vta</b> cuando ya entregaste el vuelto</span>
-      <span>Los montos se escriben en <b style="color:var(--gold)">miles</b> (8 = $8.000, 12.5 = $12.500)</span>
-    </div>`;
-  }
   return html;
 }
 
