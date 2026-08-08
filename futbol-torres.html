@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Sábados de Fútbol ⚽</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a120b;
+    --surface:#161B22;
+    --surface-2:#1E2530;
+    --surface-3:#272F3D;
+    --line: rgba(255,255,255,0.12);
+    --line-soft: rgba(255,255,255,0.06);
+    --chalk:#F5F6F2;
+    --chalk-dim:#93A0A8;
+    --gold:#FFC94D;
+    --gold-dim:#9c7a2c;
+    --win:#37D67A;
+    --win-bg: rgba(55,214,122,0.15);
+    --lose:#FF5C5C;
+    --lose-bg: rgba(255,92,92,0.15);
+    --danger:#FF5C5C;
+    --grass-1:#1f7a34;
+    --grass-2:#1a6b2c;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(180deg, rgba(6,10,7,0.90), rgba(6,10,7,0.97) 220px, var(--bg) 420px),
+      repeating-linear-gradient(90deg, var(--grass-1) 0 42px, var(--grass-2) 42px 84px);
+    color:var(--chalk);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:80px;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:0 12px;}
+
+  .topline{display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:8px;}
+  .mini-title{
+    flex:1; text-align:center; font-family:'Anton',sans-serif; font-weight:400;
+    font-size:9.5px; line-height:1.15; letter-spacing:0.4px; text-transform:uppercase; color:var(--gold);
+  }
+
+  .tabbar{
+    position:fixed; bottom:0; left:0; right:0;
+    background:#0a0f0aee; backdrop-filter:blur(8px); border-top:1px solid var(--line);
+    display:flex; z-index:50;
+  }
+  .tabbar button{
+    flex:1; background:none; border:none; color:var(--chalk-dim);
+    font-size:11px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase;
+    padding:10px 4px 8px; display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer;
+  }
+  .tabbar button .ico{font-size:17px; line-height:1;}
+  .tabbar button.active{color:var(--gold);}
+
+  .content{padding:10px 10px 16px;}
+
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:10px;}
+  .card h2{font-family:'Anton'; font-weight:400; text-transform:uppercase; font-size:15px; letter-spacing:0.4px; margin:0 0 8px; display:flex; align-items:center; gap:8px; justify-content:space-between;}
+  .eyebrow{font-family:'JetBrains Mono'; font-size:10px; color:var(--gold); letter-spacing:1.4px; text-transform:uppercase; font-weight:700; margin:0;}
+
+  .btn{font-family:'Inter'; font-weight:700; font-size:13px; border-radius:9px; border:1px solid var(--line); padding:9px 14px; cursor:pointer; background:var(--surface-2); color:var(--chalk); display:inline-flex; align-items:center; justify-content:center; gap:6px;}
+  .btn:active{transform:scale(0.98);}
+  .btn-gold{background:var(--gold); color:#1c1204; border:none;}
+  .btn-outline{background:transparent; border:1px solid var(--line); color:var(--chalk-dim);}
+  .btn-danger{background:transparent; color:var(--danger); border:1px solid rgba(194,91,74,0.4);}
+  .btn-block{width:100%;}
+  .btn-xs{padding:5px 9px; font-size:11px; border-radius:7px;}
+  .btn:disabled{opacity:0.35; cursor:not-allowed;}
+
+  input[type=text], input[type=number], input[type=date]{
+    background:var(--surface-2); border:1px solid var(--line); color:var(--chalk);
+    border-radius:8px; padding:8px 10px; font-family:'Inter'; font-size:13px;
+  }
+  input:focus{outline:2px solid var(--gold); outline-offset:1px;}
+  input:disabled{opacity:0.4;}
+
+  .phase-chip{font-family:'JetBrains Mono'; font-size:10px; letter-spacing:1px; text-transform:uppercase; font-weight:700; padding:3px 9px; border-radius:20px; display:inline-block; margin-top:2px;}
+  .phase-armando{background:var(--surface-3); color:var(--chalk-dim); border:1px solid var(--line);}
+  .phase-jugando{background:rgba(227,167,62,0.16); color:var(--gold); border:1px solid var(--gold-dim);}
+  .phase-finalizado{background:var(--win-bg); color:var(--win); border:1px solid var(--win);}
+
+  /* stat strip */
+  .stats-strip{display:flex; gap:6px; overflow-x:auto; margin-bottom:10px; padding-bottom:2px;}
+  .stat-chip{
+    flex:0 0 auto; background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:6px 10px; text-align:center; min-width:64px;
+  }
+  .stat-chip .slabel{font-size:9px; color:var(--chalk-dim); text-transform:uppercase; letter-spacing:0.4px; font-weight:700;}
+  .stat-chip .sval{font-family:'JetBrains Mono'; font-weight:700; font-size:14px; margin-top:1px;}
+  .stat-chip.gold .sval{color:var(--gold);}
+  .stat-chip.win .sval{color:var(--win);}
+  .stat-chip.warn .sval{color:var(--lose);}
+
+  /* SPREADSHEET TABLE */
+  .sheet-wrap{
+    border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--surface);
+  }
+  .sheet-scroll{
+    overflow-x:auto; overflow-y:auto; max-height:66vh;
+    -webkit-overflow-scrolling:touch;
+  }
+  table.sheet{ border-collapse:separate; border-spacing:0; width:100%; font-size:10.5px; }
+  table.sheet thead th{
+    position:sticky; top:0; z-index:3;
+    background:#10151c; color:var(--gold); font-family:'JetBrains Mono'; font-weight:700;
+    font-size:9px; text-transform:uppercase; letter-spacing:0.3px;
+    padding:5px 2px; text-align:center; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  table.sheet thead th.th-name{ text-align:left; padding-left:7px; }
+  table.sheet td{ padding:2.5px 2px; text-align:center; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+  table.sheet tbody tr:hover td{ background:rgba(255,255,255,0.02); }
+
+  .col-num{ width:22px; }
+  .col-name{ width:96px; text-align:left !important; padding-left:7px !important; }
+  .col-ll{ width:28px; }
+  .col-gp{ width:30px; }
+  .col-pago{ width:36px; }
+  .col-dio{ width:48px; }
+  .col-vta{ width:42px; }
+  .col-md{ width:26px; }
+
+  .sticky-col{ position:sticky; left:0; z-index:2; background:var(--surface); }
+  table.sheet thead th.sticky-col{ z-index:4; background:#10151c; }
+  tr.row-gk .sticky-col{ background:#22271a; }
+  tr.row-gk:hover .sticky-col{ background:#282e1f; }
+  tr.row-arrived .sticky-col{ background:#1a2029; }
+  tr.row-complete td{ background: rgba(55,214,122,0.07); }
+  tr.row-complete .sticky-col{ background: #172219; }
+  tr.row-action .sticky-col{ background:#2b2314; }
+  tr.row-action td{ background: rgba(255,201,77,0.06); }
+
+  .rownum{ font-family:'JetBrains Mono'; font-size:9.5px; color:var(--chalk-dim); }
+  .gk-tag{ font-size:12px; }
+  .rname{ font-weight:600; font-size:11px; line-height:1.1; }
+  .rname .sub{display:block; font-size:9px; color:var(--chalk-dim); font-weight:500;}
+
+  .cell-btn{
+    width:22px; height:22px; border-radius:5px; border:1px solid var(--line); background:var(--surface-2);
+    color:var(--chalk-dim); font-weight:800; font-size:10px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+    padding:0;
+  }
+  .cell-btn:disabled{ opacity:0.25; cursor:not-allowed; }
+  .cell-btn.ll-on{ background:var(--win); border-color:var(--win); color:#0a1f10; }
+  .cell-btn.gp-win{ background:var(--win-bg); border-color:var(--win); color:var(--win); }
+  .cell-btn.gp-lose{ background:var(--lose-bg); border-color:var(--lose); color:var(--lose); }
+  .cell-btn.md-e{ background:var(--surface-3); border-color:var(--gold-dim); color:var(--gold); }
+  .cell-btn.md-n{ background:rgba(140,120,220,0.16); border-color:#8c78dc; color:#b3a4ec; }
+
+  .pago-val{ font-family:'JetBrains Mono'; font-size:9.5px; color:var(--chalk-dim); }
+  .dio-input{
+    width:46px; text-align:right; padding:3px 4px; font-family:'JetBrains Mono'; font-size:10px;
+  }
+  .dio-input::-webkit-outer-spin-button, .dio-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+
+  .vta-val{ font-family:'JetBrains Mono'; font-weight:700; font-size:9.5px; cursor:default; }
+  .vta-val.devolver{ color:var(--gold); cursor:pointer; text-decoration:underline dotted; }
+  .vta-val.devolver.confirmed{ color:var(--win); text-decoration:none; }
+  .vta-val.falta{ color:var(--lose); }
+  .vta-val.exacto{ color:var(--win); }
+  .vta-val.pend{ color:var(--chalk-dim); }
+
+  .section-row td{
+    background:#10151c; color:var(--gold); font-family:'JetBrains Mono'; font-weight:700; font-size:9.5px;
+    text-transform:uppercase; letter-spacing:1px; text-align:left; padding:4px 7px; border-bottom:1px solid var(--line);
+  }
+  .section-row .sticky-col{ background:#10151c; }
+
+  /* add row form */
+  .add-strip{ display:flex; gap:6px; padding:8px; border-top:1px solid var(--line); background:var(--surface-2); align-items:center; flex-wrap:wrap; }
+  .add-strip input[type=text]{ flex:1; min-width:110px; }
+  .gk-check{ display:flex; align-items:center; gap:4px; font-size:10.5px; color:var(--chalk-dim); white-space:nowrap; }
+  .gk-check input{ width:15px; height:15px; }
+
+  .empty{text-align:center; padding:28px 16px; color:var(--chalk-dim);}
+  .empty .ico{font-size:30px; display:block; margin-bottom:6px; opacity:0.6;}
+  .empty p{margin:0 0 12px; font-size:13px;}
+
+  .legend{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; font-size:10px; color:var(--chalk-dim); }
+  .legend span{ display:inline-flex; align-items:center; gap:4px; }
+  .legend i{ width:9px; height:9px; border-radius:3px; display:inline-block; }
+
+  .modal-bg{position:fixed; inset:0; background:rgba(6,15,10,0.75); z-index:100; display:flex; align-items:flex-end; justify-content:center;}
+  .modal{background:var(--surface); border:1px solid var(--line); border-radius:16px 16px 0 0; width:100%; max-width:560px; padding:16px 14px 22px; max-height:88vh; overflow-y:auto;}
+  .modal h3{font-family:'Anton'; text-transform:uppercase; font-size:16px; margin:0 0 8px;}
+  .modal p{font-size:13px; color:var(--chalk-dim); margin:0 0 12px;}
+  .modal-actions{display:flex; gap:8px; margin-top:14px;}
+  .roster-row{ display:flex; align-items:center; gap:5px; padding:6px 0; border-bottom:1px solid var(--line); }
+  .roster-row input[type=text]{ flex:1; min-width:0; padding:6px 7px; font-size:12.5px; }
+  .roster-row .btn-xs{ flex:0 0 auto; padding:5px 7px; font-size:10.5px; white-space:nowrap; }
+
+  .toast{position:fixed; bottom:88px; left:50%; transform:translateX(-50%); background:var(--surface-3); border:1px solid var(--win); color:var(--win); padding:8px 14px; border-radius:30px; font-size:12.5px; font-weight:600; z-index:200; opacity:0; pointer-events:none; transition:opacity .25s ease;}
+  .toast.show{opacity:1;}
+
+  .hist-item{display:flex; align-items:center; gap:12px; padding:11px; border:1px solid var(--line); border-radius:12px; background:var(--surface-2); margin-bottom:8px; cursor:pointer;}
+  .hist-date{font-family:'Anton'; font-size:20px; line-height:1; color:var(--chalk); width:48px; text-align:center;}
+  .hist-date .dow{font-family:'JetBrains Mono'; font-size:8.5px; color:var(--gold); display:block; letter-spacing:1px; margin-bottom:2px;}
+  .hist-info{flex:1;}
+  .hist-info .hmain{font-weight:700; font-size:13.5px;}
+  .hist-info .hsub{font-size:11.5px; color:var(--chalk-dim);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DOW = ["DOM","LUN","MAR","MIÉ","JUE","VIE","SÁB"];
+const MONTHS = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const PRICE_WIN = 8000;
+const PRICE_LOSE = 12500;
+
+const DEFAULT_ROSTER = [
+  {name:"Daniel Taca", isGK:true},
+  {name:"Yeider", isGK:true},
+  {name:"Eduardo", isGK:false},
+  {name:"Brayan", isGK:false},
+  {name:"Daniel Taca Pa", isGK:false},
+  {name:"Andrés Susuki", isGK:false},
+  {name:"Ronaldo", isGK:false},
+  {name:"Yancarlos", isGK:false},
+  {name:"Edinson", isGK:false},
+  {name:"Dayro", isGK:false},
+  {name:"Lucho", isGK:false},
+  {name:"Ciro", isGK:false},
+  {name:"José Andrés", isGK:false},
+  {name:"Maluma", isGK:false},
+  {name:"Deiner", isGK:false},
+  {name:"Deiner Amigo", isGK:false},
+  {name:"Wilfran", isGK:false},
+  {name:"LeideR", isGK:false},
+];
+
+let state = { roster: [], weeks: [] };
+let tab = "sabado";
+let historyViewId = null;
+
+const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
+const MAX_GK = 2;
+const MAX_FIELD = 16;
+function countWeekGK(w, excludeRowId){ return w.rows.filter(r=>r.isGK && r.rowId!==excludeRowId).length; }
+function countWeekField(w, excludeRowId){ return w.rows.filter(r=>!r.isGK && r.rowId!==excludeRowId).length; }
+function canAddToWeek(w, isGK){
+  if(!w) return true;
+  return isGK ? countWeekGK(w) < MAX_GK : countWeekField(w) < MAX_FIELD;
+}
+
+const fmt = n => (Math.round(n||0)).toLocaleString('es-CO');
+const fmtMiles = n => {
+  const v = (n||0)/1000;
+  return (v % 1 === 0) ? String(v) : String(v.toFixed(1));
+};
+const fmtK = n => {
+  n = Math.round(n||0);
+  if(n===0) return '0';
+  if(n % 1000 === 0) return (n/1000) + 'k';
+  return (n/1000).toFixed(1).replace('.0','') + 'k';
+};
+
+const STORAGE_KEY = 'futbol-data-v3';
+const hasClaudeStorage = () => (typeof window.storage !== 'undefined' && typeof window.storage.get === 'function');
+
+async function storageGet(key){
+  if(hasClaudeStorage()){
+    try{ const res = await window.storage.get(key, false); if(res && res.value) return res.value; }
+    catch(e){ /* fall through to localStorage */ }
+  }
+  try{ return localStorage.getItem(key); }catch(e){ return null; }
+}
+async function storageSet(key, value){
+  let ok = false;
+  if(hasClaudeStorage()){
+    try{ await window.storage.set(key, value, false); ok = true; }catch(e){ /* fall through */ }
+  }
+  try{ localStorage.setItem(key, value); ok = true; }catch(e){ /* ignore */ }
+  return ok;
+}
+
+async function loadData(){
+  try{
+    const raw = await storageGet(STORAGE_KEY);
+    if(raw){
+      state = JSON.parse(raw);
+      if(!state.roster) state.roster = [];
+      if(!state.weeks) state.weeks = [];
+      return;
+    }
+    throw new Error('no data');
+  }catch(e){
+    state = { roster: DEFAULT_ROSTER.map(p=>({id:uid(), ...p})), weeks: [] };
+    await saveData();
+  }
+}
+async function saveData(){
+  const ok = await storageSet(STORAGE_KEY, JSON.stringify(state));
+  if(!ok) showToast('No se pudo guardar ⚠️');
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window.__toastT);
+  window.__toastT = setTimeout(()=>t.classList.remove('show'), 1700);
+}
+
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDateLong(iso){ const d = new Date(iso+"T12:00:00"); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; }
+function fmtDateShort(iso){ const d = new Date(iso+"T12:00:00"); return { dow: DOW[d.getDay()], num: d.getDate(), mon: MONTHS[d.getMonth()] }; }
+
+function getCurrentWeek(){
+  return state.weeks.find(w=>w.phase!=='finalizado') || null;
+}
+function activeWeek(){
+  return historyViewId ? state.weeks.find(x=>x.id===historyViewId) : getCurrentWeek();
+}
+
+function makeRow(rp, opts={}){
+  return { rowId: uid(), playerId: rp.id, name: rp.name, isGK: !!rp.isGK, arrived: !!opts.arrived, won: true, dio:0, modo:'E', vueltoConfirmado:false };
+}
+
+function newWeek(){
+  state.weeks.push({ id: uid(), date: todayISO(), phase: 'armando', rows: [] });
+  saveData(); render();
+}
+
+/* ---------- payment calc ---------- */
+function calcOwed(r){
+  if(!r.arrived) return null;
+  if(r.won===true) return PRICE_WIN;
+  if(r.won===false) return PRICE_LOSE;
+  return null;
+}
+function paymentStatus(r){
+  const owed = calcOwed(r);
+  if(owed===null) return {state:'sin-resultado', owed:0, dio:r.dio||0, delta:0};
+  const dio = r.dio||0;
+  if(dio<=0) return {state:'pendiente', owed, dio:0, delta:0};
+  if(dio===owed) return {state:'exacto', owed, dio, delta:0};
+  if(dio>owed) return {state:'devolver', owed, dio, delta: dio-owed};
+  return {state:'falta', owed, dio, delta: owed-dio};
+}
+function rowIsComplete(r){
+  if(!r.arrived) return false;
+  const st = paymentStatus(r);
+  if(st.state==='exacto') return true;
+  if(st.state==='devolver') return !!r.vueltoConfirmado;
+  return false;
+}
+function rowNeedsAction(r){
+  if(!r.arrived) return false;
+  const st = paymentStatus(r);
+  if(st.state==='falta') return true;
+  if(st.state==='devolver' && !r.vueltoConfirmado) return true;
+  return false;
+}
+
+/* ---------- RENDER ---------- */
+function render(){
+  const prevSheet = document.querySelector('.sheet-scroll');
+  const savedScroll = {
+    win: window.scrollY,
+    sheetTop: prevSheet ? prevSheet.scrollTop : 0,
+    sheetLeft: prevSheet ? prevSheet.scrollLeft : 0
+  };
+
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="wrap content" id="content"></div>
+    <div class="tabbar">
+      <button data-tab="sabado" class="${tab==='sabado'?'active':''}"><span class="ico">⚽</span>Partido</button>
+      <button data-tab="historial" class="${tab==='historial'?'active':''}"><span class="ico">📋</span>Historial</button>
+    </div>
+  `;
+  document.querySelectorAll('.tabbar button').forEach(b=>{ b.onclick = ()=>{ tab=b.dataset.tab; historyViewId=null; render(); }; });
+  const content = document.getElementById('content');
+  content.innerHTML = tab==='sabado' ? renderSabado() : renderHistorial();
+  wireEvents();
+
+  requestAnimationFrame(()=>{
+    window.scrollTo(0, savedScroll.win);
+    const ns = document.querySelector('.sheet-scroll');
+    if(ns){ ns.scrollTop = savedScroll.sheetTop; ns.scrollLeft = savedScroll.sheetLeft; }
+  });
+}
+
+function phaseLabel(phase){ return phase==='armando' ? 'Armando lista' : phase==='jugando' ? 'En juego' : 'Finalizado'; }
+
+function renderSabado(){
+  const w = activeWeek();
+  const readOnly = !!historyViewId;
+
+  if(!w){
+    return `<div class="empty"><span class="ico">⚽</span><p>No hay partido activo. Crea el del próximo sábado.</p>
+      <button class="btn btn-gold" id="newWeekBtn">+ Nuevo sábado</button></div>`;
+  }
+
+  let html = '';
+  if(readOnly){
+    const currentActive = getCurrentWeek();
+    const canReopen = w.phase==='finalizado' && !currentActive;
+    html += `<div class="row" style="gap:8px; margin-bottom:10px;">
+      <button class="btn btn-outline btn-block" id="backToCurrentBtn">${currentActive ? '← Volver al partido actual' : '← Volver al historial'}</button>
+      ${canReopen ? `<button class="btn btn-gold" id="reopenWeekBtn" style="flex:0 0 auto;">↺ Reabrir</button>` : ''}
+      <button class="btn btn-danger" id="deleteThisWeekBtn" style="flex:0 0 auto;">🗑</button>
+    </div>`;
+    if(w.phase==='finalizado' && currentActive){
+      html += `<div class="empty" style="padding:6px 0 14px;"><p style="margin:0;">Tienes otro sábado activo. Termínalo antes de reabrir este.</p></div>`;
+    }
+  }
+
+  html += `<div class="topline">
+    <div>
+      <div class="eyebrow">${fmtDateLong(w.date)}</div>
+      <span class="phase-chip phase-${w.phase}">${phaseLabel(w.phase)}</span>
+    </div>
+    <div class="mini-title">⚽ SÁBADOS<br>DE FÚTBOL ⚽</div>
+    <div style="display:flex; gap:6px;">
+      ${!readOnly ? `<button class="btn btn-outline btn-xs" id="changeDateBtn">📅</button>` : ''}
+      ${!readOnly ? `<button class="btn btn-outline btn-xs" id="editRosterBtn">✎ Plantel</button>` : ''}
+    </div>
+  </div>`;
+
+  const cellsLocked = w.phase !== 'jugando';
+  const showAdd = !readOnly;
+  const arrived = w.rows.filter(r=>r.arrived);
+
+  if(w.phase==='jugando' && arrived.length>0){
+    let recaudado=0, efectivo=0, nequi=0, pendientes=0;
+    arrived.forEach(r=>{
+      const st = paymentStatus(r);
+      recaudado += Math.min(st.dio, st.owed);
+      if(r.modo==='E') efectivo += Math.min(st.dio, st.owed);
+      if(r.modo==='N') nequi += Math.min(st.dio, st.owed);
+      if(rowNeedsAction(r) || st.state==='pendiente' || st.state==='sin-resultado') pendientes++;
+    });
+    html += `<div class="stats-strip">
+      <div class="stat-chip gold"><div class="slabel">Recaudado</div><div class="sval">$${fmt(recaudado)}</div></div>
+      <div class="stat-chip"><div class="slabel">Llegaron</div><div class="sval">${arrived.length}/${w.rows.length}</div></div>
+      <div class="stat-chip win"><div class="slabel">Efectivo</div><div class="sval">$${fmt(efectivo)}</div></div>
+      <div class="stat-chip win"><div class="slabel">Nequi</div><div class="sval">$${fmt(nequi)}</div></div>
+      <div class="stat-chip ${pendientes>0?'warn':''}"><div class="slabel">Pendientes</div><div class="sval">${pendientes}</div></div>
+    </div>`;
+  }
+
+  html += renderSheet(w, cellsLocked || readOnly, showAdd);
+
+  if(!readOnly){
+    if(w.phase==='armando'){
+      html += `<button class="btn btn-gold btn-block" id="startGameBtn" style="margin-top:10px;" ${w.rows.length===0?'disabled':''}>▶ Iniciar juego</button>`;
+    } else if(w.phase==='jugando'){
+      html += `<button class="btn btn-gold btn-block" id="finishGameBtn" style="margin-top:10px;">🏁 Finalizar juego</button>`;
+    }
+  }
+
+  return html;
+}
+
+function renderSheet(w, cellsLocked, showAdd){
+  const gkRows = w.rows.filter(r=>r.isGK);
+  const fieldRows = w.rows.filter(r=>!r.isGK);
+
+  function rowHtml(r, label){
+    const st = paymentStatus(r);
+    const complete = rowIsComplete(r);
+    const needsAction = rowNeedsAction(r);
+    let trClass = r.isGK ? 'row-gk' : '';
+    if(complete) trClass += ' row-complete';
+    else if(needsAction) trClass += ' row-action';
+    else if(r.arrived) trClass += ' row-arrived';
+
+    let vtaHtml = '';
+    if(st.state==='sin-resultado') vtaHtml = `<span class="vta-val pend">—</span>`;
+    else if(st.state==='pendiente') vtaHtml = `<span class="vta-val pend">·</span>`;
+    else if(st.state==='exacto') vtaHtml = `<span class="vta-val exacto">✓ ok</span>`;
+    else if(st.state==='falta') vtaHtml = `<span class="vta-val falta">-${fmtK(st.delta)}</span>`;
+    else if(st.state==='devolver'){
+      if(r.vueltoConfirmado) vtaHtml = `<span class="vta-val devolver confirmed" data-toggle-vuelto="${r.rowId}">✓ dado</span>`;
+      else vtaHtml = `<span class="vta-val devolver" data-toggle-vuelto="${r.rowId}">+${fmtK(st.delta)}</span>`;
+    }
+
+    return `<tr class="${trClass}">
+      <td class="col-num sticky-col"><span class="rownum">${label}</span></td>
+      <td class="col-name sticky-col"><span class="rname">${escapeHtml(r.name)}</span></td>
+      <td class="col-ll"><button class="cell-btn ${r.arrived?'ll-on':''}" data-toggle-arrived="${r.rowId}" ${cellsLocked?'disabled':''}>${r.arrived?'✓':''}</button></td>
+      <td class="col-gp"><button class="cell-btn ${r.won===true?'gp-win':r.won===false?'gp-lose':''}" data-cycle-won="${r.rowId}" ${cellsLocked||!r.arrived?'disabled':''}>${r.won===true?'G':r.won===false?'P':'—'}</button></td>
+      <td class="col-pago"><span class="pago-val">${st.owed?fmtK(st.owed):'—'}</span></td>
+      <td class="col-dio"><input type="number" min="0" step="0.5" class="dio-input" data-dio="${r.rowId}" value="${r.dio?fmtMiles(r.dio):''}" placeholder="0" ${cellsLocked||!r.arrived?'disabled':''}></td>
+      <td class="col-vta">${vtaHtml}</td>
+      <td class="col-md"><button class="cell-btn ${r.modo==='E'?'md-e':r.modo==='N'?'md-n':''}" data-cycle-modo="${r.rowId}" ${cellsLocked||!r.arrived?'disabled':''}>${r.modo||'—'}</button></td>
+    </tr>`;
+  }
+
+  let html = `<div class="sheet-wrap"><div class="sheet-scroll"><table class="sheet">
+    <thead><tr>
+      <th class="col-num sticky-col">#</th>
+      <th class="col-name th-name sticky-col">Nombre</th>
+      <th class="col-ll">Ll</th>
+      <th class="col-gp">G/P</th>
+      <th class="col-pago">Pago</th>
+      <th class="col-dio">Dio</th>
+      <th class="col-vta">Vta</th>
+      <th class="col-md">Md</th>
+    </tr></thead>
+    <tbody>`;
+
+  if(gkRows.length>0){
+    html += `<tr class="section-row"><td colspan="8" class="sticky-col">🥅 Arqueros</td></tr>`;
+    gkRows.forEach(r=> html += rowHtml(r, '🥅'));
+  }
+  if(fieldRows.length>0){
+    html += `<tr class="section-row"><td colspan="8" class="sticky-col">⚽ Jugadores</td></tr>`;
+    fieldRows.forEach((r,i)=> html += rowHtml(r, i+1));
+  }
+  if(w.rows.length===0){
+    html += `<tr><td colspan="8" style="padding:18px; color:var(--chalk-dim); text-align:center;">Agrega jugadores abajo o desde "Plantel"</td></tr>`;
+  }
+
+  html += `</tbody></table></div>`;
+  if(showAdd){
+    html += `<div class="add-strip">
+      <button class="btn btn-outline btn-xs" id="pickFromRosterBtn">👥 Desde plantel</button>
+      <input type="text" id="quickAddInput" placeholder="Jugador nuevo...">
+      <label class="gk-check"><input type="checkbox" id="quickAddGK"> Arq.</label>
+      <button class="btn btn-gold btn-xs" id="quickAddBtn">+</button>
+    </div>`;
+  }
+  html += `</div>`;
+
+  if(showAdd){
+    html += `<div class="legend">
+      <span><i style="background:rgba(55,214,122,0.35)"></i>Completo</span>
+      <span><i style="background:rgba(255,201,77,0.35)"></i>Necesita acción</span>
+      <span>Toca <b style="color:var(--gold)">Vta</b> cuando ya entregaste el vuelto</span>
+      <span>Los montos se escriben en <b style="color:var(--gold)">miles</b> (8 = $8.000, 12.5 = $12.500)</span>
+    </div>`;
+  }
+  return html;
+}
+
+function renderHistorial(){
+  const finished = state.weeks.filter(w=>w.phase==='finalizado').slice().reverse();
+  if(finished.length===0){
+    return `<div class="empty"><span class="ico">📋</span><p>Todavía no hay sábados finalizados.</p></div>`;
+  }
+  let html = `<div class="eyebrow" style="margin-bottom:8px;">Historial · ${finished.length} sábado${finished.length>1?'s':''}</div>`;
+  finished.forEach(w=>{
+    const d = fmtDateShort(w.date);
+    const arrived = w.rows.filter(r=>r.arrived);
+    let recaudado=0;
+    arrived.forEach(r=>{ const st=paymentStatus(r); recaudado += Math.min(st.dio, st.owed); });
+    html += `<div class="hist-item" data-view-week="${w.id}">
+      <div class="hist-date">${d.num}<span class="dow">${d.mon}</span></div>
+      <div class="hist-info">
+        <div class="hmain">${arrived.length} jugadores</div>
+        <div class="hsub">Recaudado $${fmt(recaudado)}</div>
+      </div>
+      <div class="stat-chip" style="min-width:auto;">${d.dow}</div>
+      <button class="btn btn-xs btn-danger" data-delete-week="${w.id}" title="Eliminar">🗑</button>
+    </div>`;
+  });
+  return html;
+}
+
+function weekPlayerPickerModal(w){
+  const inWeek = new Set(w.rows.map(r=>r.playerId));
+  let html = `<div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>Convocar desde plantel</h3>
+    <p>Toca para agregar o quitar del sábado de hoy.</p>
+    <input type="text" id="pickerSearch" placeholder="Buscar..." style="width:100%; margin-bottom:10px;">
+    <div id="pickerList">`;
+  const gk = state.roster.filter(p=>p.isGK);
+  const field = state.roster.filter(p=>!p.isGK);
+  function prow(p){
+    const sel = inWeek.has(p.id);
+    return `<div class="roster-row" data-pick-name="${escapeAttr(p.name.toLowerCase())}" data-pick="${p.id}" style="cursor:pointer;">
+      <span style="width:22px;height:22px;border-radius:6px;border:2px solid ${sel?'var(--win)':'var(--chalk-dim)'};background:${sel?'var(--win)':'none'};color:#0a1f10;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex-shrink:0;">${sel?'✓':''}</span>
+      <span style="flex:1;font-weight:600;font-size:13.5px;">${p.isGK?'🥅 ':''}${escapeHtml(p.name)}</span>
+    </div>`;
+  }
+  if(gk.length) html += gk.map(prow).join('');
+  if(field.length) html += field.map(prow).join('');
+  if(state.roster.length===0) html += `<p>Tu plantel está vacío. Agrega jugadores desde "✎ Plantel".</p>`;
+  html += `</div>
+    <div class="modal-actions">
+      <button class="btn btn-gold btn-block" id="closePickerBtn">Listo</button>
+    </div>
+  </div></div>`;
+  return html;
+}
+
+function rosterEditorModal(){
+  const w = getCurrentWeek();
+  let html = `<div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>Plantel</h3>
+    <p>${w ? 'Toca "+ Hoy" para convocar a alguien al sábado activo.' : 'Crea un sábado en la pestaña Partido para poder convocar desde aquí.'}</p>
+    <div id="rosterList">`;
+  state.roster.forEach(p=>{
+    const inWeek = w && w.rows.some(r=>r.playerId===p.id);
+    html += `<div class="roster-row">
+      <input type="text" data-roster-name="${p.id}" value="${escapeAttr(p.name)}">
+      <button class="btn btn-xs ${p.isGK?'btn-gold':'btn-outline'}" data-roster-gk="${p.id}">${p.isGK?'🥅':'Arq.'}</button>
+      ${w ? `<button class="btn btn-xs ${inWeek?'btn-gold':'btn-outline'}" data-roster-convene="${p.id}">${inWeek?'✓ Hoy':'+ Hoy'}</button>` : ''}
+      <button class="btn btn-xs btn-danger" data-roster-remove="${p.id}">✕</button>
+    </div>`;
+  });
+  html += `</div>
+    <div class="add-strip" style="border:none; padding:10px 0 0; background:none;">
+      <input type="text" id="rosterAddInput" placeholder="Nuevo jugador...">
+      <label class="gk-check"><input type="checkbox" id="rosterAddGK"> Arq.</label>
+      <button class="btn btn-gold btn-xs" id="rosterAddBtn">+</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-gold btn-block" id="closeRosterBtn">Listo</button>
+    </div>
+  </div></div>`;
+  return html;
+}
+
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+/* ---------- EVENTS ---------- */
+function wireEvents(){
+  const q = sel => document.querySelector(sel);
+  const qa = sel => document.querySelectorAll(sel);
+
+  const newWeekBtn = q('#newWeekBtn');
+  if(newWeekBtn) newWeekBtn.onclick = newWeek;
+
+  const changeDateBtn = q('#changeDateBtn');
+  if(changeDateBtn) changeDateBtn.onclick = ()=>{
+    const w = getCurrentWeek();
+    openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
+      <h3>Fecha del sábado</h3>
+      <input type="date" id="dateInput" value="${w.date}" style="width:100%;">
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-block" id="cancelDateBtn">Cancelar</button>
+        <button class="btn btn-gold btn-block" id="saveDateBtn">Guardar</button>
+      </div>
+    </div></div>`);
+    q('#cancelDateBtn').onclick = closeModal;
+    q('#saveDateBtn').onclick = ()=>{ w.date = q('#dateInput').value || w.date; saveData(); closeModal(); render(); };
+  };
+
+  const editRosterBtn = q('#editRosterBtn');
+  if(editRosterBtn) editRosterBtn.onclick = ()=>{ openModal(rosterEditorModal()); wireRosterModal(); };
+
+  const pickFromRosterBtn = q('#pickFromRosterBtn');
+  if(pickFromRosterBtn) pickFromRosterBtn.onclick = ()=>{
+    const w = getCurrentWeek();
+    openModal(weekPlayerPickerModal(w));
+    wirePickerModal(w);
+  };
+
+  const backBtn = q('#backToCurrentBtn');
+  if(backBtn) backBtn.onclick = ()=>{
+    const hadCurrent = !!getCurrentWeek();
+    historyViewId=null;
+    if(!hadCurrent) tab='historial';
+    render();
+  };
+
+  const reopenWeekBtn = q('#reopenWeekBtn');
+  if(reopenWeekBtn) reopenWeekBtn.onclick = ()=>{
+    const w = state.weeks.find(x=>x.id===historyViewId);
+    if(!w) return;
+    w.phase = 'jugando';
+    historyViewId = null;
+    saveData(); render();
+    showToast('Partido reabierto ↺');
+  };
+
+  const deleteThisWeekBtn = q('#deleteThisWeekBtn');
+  if(deleteThisWeekBtn) deleteThisWeekBtn.onclick = ()=>{
+    const id = historyViewId;
+    const w = state.weeks.find(x=>x.id===id);
+    openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
+      <h3>¿Eliminar este sábado?</h3>
+      <p>${w ? fmtDateLong(w.date) : ''} — esta acción no se puede deshacer.</p>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-block" id="cancelDeleteWeekBtn">Cancelar</button>
+        <button class="btn btn-danger btn-block" id="confirmDeleteWeekBtn">Eliminar</button>
+      </div>
+    </div></div>`);
+    q('#cancelDeleteWeekBtn').onclick = closeModal;
+    q('#confirmDeleteWeekBtn').onclick = ()=>{
+      state.weeks = state.weeks.filter(x=>x.id!==id);
+      historyViewId = null;
+      saveData(); closeModal(); tab='historial'; render(); showToast('Partido eliminado');
+    };
+  };
+
+  qa('[data-view-week]').forEach(el=>{ el.onclick = ()=>{ historyViewId = el.dataset.viewWeek; tab='sabado'; render(); }; });
+
+  qa('[data-delete-week]').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      const id = btn.dataset.deleteWeek;
+      const w = state.weeks.find(x=>x.id===id);
+      openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
+        <h3>¿Eliminar este sábado?</h3>
+        <p>${w ? fmtDateLong(w.date) : ''} — esta acción no se puede deshacer.</p>
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-block" id="cancelDeleteWeekBtn">Cancelar</button>
+          <button class="btn btn-danger btn-block" id="confirmDeleteWeekBtn">Eliminar</button>
+        </div>
+      </div></div>`);
+      q('#cancelDeleteWeekBtn').onclick = closeModal;
+      q('#confirmDeleteWeekBtn').onclick = ()=>{
+        state.weeks = state.weeks.filter(x=>x.id!==id);
+        saveData(); closeModal(); render(); showToast('Partido eliminado');
+      };
+    };
+  });
+
+  const startGameBtn = q('#startGameBtn');
+  if(startGameBtn) startGameBtn.onclick = ()=>{
+    const w = getCurrentWeek();
+    w.rows.forEach(r=>{ r.won = true; r.modo = 'E'; });
+    w.phase='jugando'; saveData(); render(); showToast('¡Juego iniciado! Todos en Ganó / Efectivo ⚽');
+  };
+
+  const finishGameBtn = q('#finishGameBtn');
+  if(finishGameBtn) finishGameBtn.onclick = ()=>{
+    const w = getCurrentWeek();
+    const arrived = w.rows.filter(r=>r.arrived);
+    const pendientes = arrived.filter(r=> rowNeedsAction(r) || paymentStatus(r).state==='pendiente' || paymentStatus(r).state==='sin-resultado').length;
+    if(pendientes>0){
+      openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
+        <h3>¿Finalizar de todas formas?</h3>
+        <p>${pendientes} jugador${pendientes>1?'es':''} todavía ${pendientes>1?'tienen':'tiene'} algo pendiente (pago o vuelto).</p>
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-block" id="cancelFinishBtn">Seguir</button>
+          <button class="btn btn-gold btn-block" id="confirmFinishBtn">Finalizar igual</button>
+        </div>
+      </div></div>`);
+      q('#cancelFinishBtn').onclick = closeModal;
+      q('#confirmFinishBtn').onclick = ()=>{ doFinish(w); closeModal(); };
+    } else { doFinish(w); }
+  };
+
+  // sheet interactions
+  qa('[data-toggle-arrived]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const w = getCurrentWeek();
+      const r = w.rows.find(x=>x.rowId===btn.dataset.toggleArrived);
+      r.arrived = !r.arrived;
+      if(!r.arrived){ r.won=true; r.dio=0; r.modo='E'; r.vueltoConfirmado=false; }
+      saveData(); render();
+    };
+  });
+  qa('[data-cycle-won]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const w = getCurrentWeek();
+      const r = w.rows.find(x=>x.rowId===btn.dataset.cycleWon);
+      r.won = !(r.won===true);
+      r.vueltoConfirmado = false;
+      saveData(); render();
+    };
+  });
+  qa('[data-dio]').forEach(inp=>{
+    inp.onchange = ()=>{
+      const w = getCurrentWeek();
+      const r = w.rows.find(x=>x.rowId===inp.dataset.dio);
+      r.dio = Math.round((parseFloat(inp.value)||0)*1000);
+      r.vueltoConfirmado = false;
+      saveData(); render();
+    };
+  });
+  qa('[data-cycle-modo]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const w = getCurrentWeek();
+      const r = w.rows.find(x=>x.rowId===btn.dataset.cycleModo);
+      r.modo = r.modo==='' ? 'E' : r.modo==='E' ? 'N' : '';
+      saveData(); render();
+    };
+  });
+  qa('[data-toggle-vuelto]').forEach(el=>{
+    el.onclick = ()=>{
+      const w = getCurrentWeek();
+      const r = w.rows.find(x=>x.rowId===el.dataset.toggleVuelto);
+      r.vueltoConfirmado = !r.vueltoConfirmado;
+      saveData(); render();
+      if(r.vueltoConfirmado) showToast('Vuelto marcado como entregado ✓');
+    };
+  });
+
+  // quick add player (within current week + roster)
+  const quickAddBtn = q('#quickAddBtn');
+  function quickAdd(){
+    const w = getCurrentWeek();
+    const inp = q('#quickAddInput');
+    const name = (inp.value||'').trim();
+    if(!name) return;
+    const isGK = q('#quickAddGK').checked;
+    if(!canAddToWeek(w, isGK)){
+      showToast(isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
+      return;
+    }
+    let rp = state.roster.find(p=>p.name.toLowerCase()===name.toLowerCase());
+    if(!rp){ rp = {id:uid(), name, isGK}; state.roster.push(rp); }
+    w.rows.push(makeRow(rp, {arrived:true}));
+    saveData(); render();
+    setTimeout(()=>{ const i=q('#quickAddInput'); if(i) i.focus(); }, 0);
+  }
+  if(quickAddBtn) quickAddBtn.onclick = quickAdd;
+  const quickAddInput = q('#quickAddInput');
+  if(quickAddInput) quickAddInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); quickAdd(); } });
+}
+
+function wirePickerModal(w){
+  const q = sel => document.querySelector(sel);
+  const qa = sel => document.querySelectorAll(sel);
+
+  qa('[data-pick]').forEach(el=>{
+    el.onclick = ()=>{
+      const id = el.dataset.pick;
+      const idx = w.rows.findIndex(r=>r.playerId===id);
+      if(idx>=0){
+        w.rows.splice(idx,1);
+      } else {
+        const rp = state.roster.find(p=>p.id===id);
+        if(!rp) return;
+        if(!canAddToWeek(w, rp.isGK)){
+          showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
+          return;
+        }
+        w.rows.push(makeRow(rp));
+      }
+      saveData();
+      const nowSel = w.rows.some(r=>r.playerId===id);
+      const badge = el.querySelector('span');
+      badge.style.borderColor = nowSel ? 'var(--win)' : 'var(--chalk-dim)';
+      badge.style.background = nowSel ? 'var(--win)' : 'none';
+      badge.textContent = nowSel ? '✓' : '';
+    };
+  });
+  const search = q('#pickerSearch');
+  if(search) search.oninput = ()=>{
+    const v = search.value.toLowerCase();
+    qa('[data-pick-name]').forEach(el=>{ el.style.display = el.dataset.pickName.includes(v) ? 'flex' : 'none'; });
+  };
+  const closeBtn = q('#closePickerBtn');
+  if(closeBtn) closeBtn.onclick = ()=>{ closeModal(); render(); };
+}
+
+function wireRosterModal(){
+  const q = sel => document.querySelector(sel);
+  const qa = sel => document.querySelectorAll(sel);
+
+  qa('[data-roster-name]').forEach(inp=>{
+    inp.onchange = ()=>{
+      const p = state.roster.find(x=>x.id===inp.dataset.rosterName);
+      p.name = inp.value.trim() || p.name;
+      const w = getCurrentWeek();
+      if(w){ w.rows.filter(r=>r.playerId===p.id).forEach(r=> r.name = p.name); }
+      saveData();
+    };
+  });
+  qa('[data-roster-gk]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const p = state.roster.find(x=>x.id===btn.dataset.rosterGk);
+      p.isGK = !p.isGK;
+      saveData();
+      btn.className = 'btn btn-xs ' + (p.isGK?'btn-gold':'btn-outline');
+      btn.textContent = p.isGK ? '🥅' : 'Arq.';
+    };
+  });
+  qa('[data-roster-remove]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const pid = btn.dataset.rosterRemove;
+      state.roster = state.roster.filter(x=>x.id!==pid);
+      const w = getCurrentWeek();
+      if(w) w.rows = w.rows.filter(r=>r.playerId!==pid);
+      saveData();
+      btn.closest('.roster-row').remove();
+    };
+  });
+  qa('[data-roster-convene]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const w = getCurrentWeek();
+      if(!w) return;
+      const pid = btn.dataset.rosterConvene;
+      const idx = w.rows.findIndex(r=>r.playerId===pid);
+      if(idx>=0){
+        w.rows.splice(idx,1);
+      } else {
+        const rp = state.roster.find(p=>p.id===pid);
+        if(!rp) return;
+        if(!canAddToWeek(w, rp.isGK)){
+          showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
+          return;
+        }
+        w.rows.push(makeRow(rp));
+      }
+      saveData();
+      const nowIn = w.rows.some(r=>r.playerId===pid);
+      btn.className = 'btn btn-xs ' + (nowIn?'btn-gold':'btn-outline');
+      btn.textContent = nowIn ? '✓ Hoy' : '+ Hoy';
+    };
+  });
+  const addBtn = q('#rosterAddBtn');
+  function addRoster(){
+    const inp = q('#rosterAddInput');
+    const name = (inp.value||'').trim();
+    if(!name) return;
+    const isGK = q('#rosterAddGK').checked;
+    state.roster.push({id:uid(), name, isGK});
+    saveData();
+    closeModal();
+    openModal(rosterEditorModal());
+    wireRosterModal();
+  }
+  if(addBtn) addBtn.onclick = addRoster;
+  const addInput = q('#rosterAddInput');
+  if(addInput) addInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addRoster(); } });
+
+  const closeBtn = q('#closeRosterBtn');
+  if(closeBtn) closeBtn.onclick = ()=>{ closeModal(); render(); };
+}
+
+function doFinish(w){ w.phase='finalizado'; saveData(); render(); showToast('Sábado finalizado ✓'); }
+
+function openModal(html){
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  document.body.appendChild(div.firstElementChild);
+  const bg = document.getElementById('modalBg');
+  if(bg) bg.addEventListener('click', (e)=>{ if(e.target.id==='modalBg'){ closeModal(); render(); } });
+}
+function closeModal(){ const m = document.getElementById('modalBg'); if(m) m.remove(); }
+
+/* ---------- INIT ---------- */
+(async function init(){
+  document.getElementById('app').innerHTML = `<div class="empty" style="padding-top:70px;"><span class="ico">⚽</span><p>Cargando...</p></div>`;
+  await loadData();
+  render();
+})();
+</script>
+</body>
+</html>
