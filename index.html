@@ -201,6 +201,9 @@
   .roster-row{ display:flex; align-items:center; gap:5px; padding:6px 0; border-bottom:1px solid var(--line); }
   .roster-row input[type=text]{ flex:1; min-width:0; padding:6px 7px; font-size:12.5px; }
   .roster-row .btn-xs{ flex:0 0 auto; padding:5px 7px; font-size:10.5px; white-space:nowrap; }
+  .roster-row .btn-icon{ flex:0 0 auto; padding:5px 6px; font-size:11px; min-width:26px; }
+  .btn-wsp{ background:#25D366; border-color:#25D366; color:#062b13; font-weight:800; }
+  .btn-wsp:disabled{ opacity:0.35; cursor:not-allowed; }
 
   .toast{position:fixed; bottom:88px; left:50%; transform:translateX(-50%); background:var(--surface-3); border:1px solid var(--win); color:var(--win); padding:8px 14px; border-radius:30px; font-size:12.5px; font-weight:600; z-index:200; opacity:0; pointer-events:none; transition:opacity .25s ease;}
   .toast.show{opacity:1;}
@@ -594,9 +597,16 @@ function weekPlayerPickerModal(w){
 
 function rosterEditorModal(){
   const w = getCurrentWeek();
+  const convocados = w ? w.rows.map(r=>state.roster.find(p=>p.id===r.playerId)).filter(p=>p && p.phone) : [];
   let html = `<div class="modal-bg" id="modalBg"><div class="modal">
     <h3>Plantel</h3>
     <p>${w ? 'Toca "+ Hoy" para convocar a alguien al sábado activo.' : 'Crea un sábado en la pestaña Partido para poder convocar desde aquí.'}</p>
+    <div id="bulkReminderBox" style="margin-bottom:10px;">
+      ${w ? (convocados.length>0
+        ? `<button class="btn btn-wsp btn-block" id="bulkWspBtn">📢 Recordar a todos los convocados (${convocados.length})</button>`
+        : `<p style="font-size:11px;color:var(--chalk-dim);">Agrega números de WhatsApp a los convocados de hoy para poder recordarles a todos de una.</p>`)
+      : ''}
+    </div>
     <div id="rosterList">`;
   state.roster.forEach(p=>{
     const inWeek = w && w.rows.some(r=>r.playerId===p.id);
@@ -604,6 +614,11 @@ function rosterEditorModal(){
       <input type="text" data-roster-name="${p.id}" value="${escapeAttr(p.name)}">
       <button class="btn btn-xs ${p.isGK?'btn-gold':'btn-outline'}" data-roster-gk="${p.id}">${p.isGK?'🥅':'Arq.'}</button>
       ${w ? `<button class="btn btn-xs ${inWeek?'btn-gold':'btn-outline'}" data-roster-convene="${p.id}">${inWeek?'✓ Hoy':'+ Hoy'}</button>` : ''}
+      ${p.phone
+        ? `<button class="btn btn-icon btn-wsp" data-roster-wsp="${p.id}" title="Enviar WhatsApp">💬</button>
+           <button class="btn btn-icon btn-outline" data-roster-phone-edit="${p.id}" title="Editar número">✎</button>`
+        : `<button class="btn btn-icon btn-outline" data-roster-phone-edit="${p.id}" title="Agregar número de WhatsApp">📞+</button>`
+      }
       <button class="btn btn-xs btn-danger" data-roster-remove="${p.id}">✕</button>
     </div>`;
   });
@@ -848,6 +863,61 @@ function wirePickerModal(w){
   if(closeBtn) closeBtn.onclick = ()=>{ closeModal(); render(); };
 }
 
+function buildWspMessage(name){
+  const primerNombre = (name||'').trim().split(' ')[0];
+  return `Eyy ${primerNombre} ⚽, te recuerdo el partido a las 2 pm. En Torres. Ojo puntual ⏰.
+Confirmando ✅`;
+}
+function sendWsp(p){
+  if(!p || !p.phone) return;
+
+  const phone = String(p.phone).replace(/[^0-9]/g,'');
+  const text = encodeURIComponent(buildWspMessage(p.name));
+
+  // Intent de Android: fuerza el paquete de WhatsApp normal
+  // (com.whatsapp), evitando que se abra WhatsApp Business.
+  const intentUrl =
+    `intent://send?phone=${phone}&text=${text}` +
+    `#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+
+  // En Android intent:// permite seleccionar directamente la app
+  // indicada. Si el navegador no admite intent://, usamos el enlace
+  // normal como respaldo.
+  try {
+    window.location.href = intentUrl;
+  } catch(e) {
+    window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+  }
+}
+
+function openPhoneEditModal(p){
+  const box = document.createElement('div');
+  box.id = 'phoneEditBg';
+  box.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;';
+  box.innerHTML = `<div style="background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px; width:100%; max-width:340px;">
+    <h3 style="margin:0 0 4px;">WhatsApp de ${escapeHtml(p.name)}</h3>
+    <p style="margin:0 0 10px; font-size:11.5px; color:var(--chalk-dim);">Con indicativo de país, sin + ni espacios. Ej: 573001234567</p>
+    <input type="tel" id="phoneEditInput" value="${escapeAttr(p.phone||'')}" placeholder="573001234567" style="width:100%; padding:8px 9px; font-size:13px; margin-bottom:12px;">
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-outline" id="phoneEditCancel" style="flex:1;">Cancelar</button>
+      <button class="btn btn-gold" id="phoneEditSave" style="flex:1;">Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(box);
+  const input = box.querySelector('#phoneEditInput');
+  input.focus();
+  box.querySelector('#phoneEditCancel').onclick = ()=> box.remove();
+  box.addEventListener('click', (e)=>{ if(e.target.id==='phoneEditBg') box.remove(); });
+  box.querySelector('#phoneEditSave').onclick = ()=>{
+    p.phone = (input.value||'').replace(/[^0-9]/g,'');
+    saveData();
+    box.remove();
+    closeModal();
+    openModal(rosterEditorModal());
+    wireRosterModal();
+  };
+}
+
 function wireRosterModal(){
   const q = sel => document.querySelector(sel);
   const qa = sel => document.querySelectorAll(sel);
@@ -903,6 +973,49 @@ function wireRosterModal(){
       btn.textContent = nowIn ? '✓ Hoy' : '+ Hoy';
     };
   });
+  qa('[data-roster-phone-edit]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const p = state.roster.find(x=>x.id===btn.dataset.rosterPhoneEdit);
+      if(!p) return;
+      openPhoneEditModal(p);
+    };
+  });
+  qa('[data-roster-wsp]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const p = state.roster.find(x=>x.id===btn.dataset.rosterWsp);
+      sendWsp(p);
+    };
+  });
+
+  let bulkQueue = [];
+  let bulkIndex = 0;
+  function renderBulkStep(){
+    const box = q('#bulkReminderBox');
+    if(!box) return;
+    if(bulkIndex >= bulkQueue.length){
+      box.innerHTML = `<p style="font-size:11px;color:var(--win);text-align:center;">✅ Recordatorio enviado a los ${bulkQueue.length} convocados.</p>`;
+      return;
+    }
+    const p = bulkQueue[bulkIndex];
+    box.innerHTML = `<div style="display:flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:7px 8px;">
+      <span style="flex:1; font-size:11px;">👉 Siguiente: <b>${escapeHtml(p.name)}</b> (${bulkIndex+1}/${bulkQueue.length})</span>
+      <button class="btn btn-wsp btn-xs" id="bulkSendStepBtn">💬 Enviar</button>
+      <button class="btn btn-xs btn-outline" id="bulkCancelBtn">✕</button>
+    </div>`;
+    q('#bulkSendStepBtn').onclick = ()=>{ sendWsp(p); bulkIndex++; renderBulkStep(); };
+    q('#bulkCancelBtn').onclick = ()=>{ box.innerHTML = ''; };
+  }
+  const bulkBtn = q('#bulkWspBtn');
+  if(bulkBtn){
+    bulkBtn.onclick = ()=>{
+      const w = getCurrentWeek();
+      if(!w) return;
+      bulkQueue = w.rows.map(r=>state.roster.find(p=>p.id===r.playerId)).filter(p=>p && p.phone);
+      bulkIndex = 0;
+      renderBulkStep();
+    };
+  }
+
   const addBtn = q('#rosterAddBtn');
   function addRoster(){
     const inp = q('#rosterAddInput');
