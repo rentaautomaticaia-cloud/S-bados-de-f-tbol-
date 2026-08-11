@@ -637,13 +637,12 @@ function campTotals(){
 
   const quota = campPlayerInscripcionQuota();
   const installment = campPlayerInscripcionInstallment();
-  const fechasTranscurridas = cfg ? Math.min(fechas.length, cfg.numFechas) : 0;
 
   Object.values(players).forEach(pl=>{
     if(pl.isGK){ pl.leToca = 0; pl.debeInsc = 0; return; }
-    // La inscripción es una cuota fija del jugador (le toque o no jugar cada fecha puntual);
-    // se va "activando" a medida que avanzan las fechas del campeonato, sin pasarse de su cuota total.
-    pl.leToca = Math.min(quota, installment * fechasTranscurridas);
+    // "Le toca" muestra la cuota TOTAL de inscripción que le corresponde a cada jugador
+    // (inscripción total del campeonato repartida entre todo el plantel de campo).
+    pl.leToca = quota;
     pl.debeInsc = pl.leToca - pl.insc;
   });
 
@@ -1578,19 +1577,29 @@ function renderCampFechasTab(){
   const arrived = f.rows.filter(r=>r.arrived);
 
   if(f.phase==='jugando' && arrived.length>0){
-    let recaudado=0, efectivo=0, nequi=0;
+    let recaudado=0, efectivo=0, nequi=0, recArb=0, recInsc=0;
     arrived.forEach(r=>{
       const deb = rowDebido(r,f);
       const pagado = Math.min(r.dio||0, deb.total);
       recaudado += pagado;
       if(r.modo==='E') efectivo += pagado;
       if(r.modo==='N') nequi += pagado;
+      // El arbitraje se cobra primero (es del día); el resto de lo pagado va a inscripción
+      const arbPagado = Math.min(pagado, deb.arbitraje);
+      const inscPagado = pagado - arbPagado;
+      recArb += arbPagado;
+      recInsc += inscPagado;
     });
     html += `<div class="stats-strip">
       <div class="stat-chip gold"><div class="slabel">Total recaudado</div><div class="sval" id="campStatRecaudado">$${fmt(recaudado)}</div></div>
       <div class="stat-chip"><div class="slabel">Llegaron</div><div class="sval">${arrived.length}/${f.rows.length}</div></div>
       <div class="stat-chip win"><div class="slabel">Efectivo</div><div class="sval" id="campStatEfectivo">$${fmt(efectivo)}</div></div>
       <div class="stat-chip win"><div class="slabel">Nequi</div><div class="sval" id="campStatNequi">$${fmt(nequi)}</div></div>
+    </div>
+    <div class="stats-strip" style="margin-top:6px;">
+      <div class="stat-chip"><div class="slabel">Recaudado arbitraje</div><div class="sval" id="campStatRecArb">$${fmt(recArb)}</div></div>
+      <div class="stat-chip"><div class="slabel">Recaudado inscripción</div><div class="sval" id="campStatRecInsc">$${fmt(recInsc)}</div></div>
+      <div class="stat-chip gold"><div class="slabel">Total bruto</div><div class="sval" id="campStatBruto">$${fmt(recArb+recInsc)}</div></div>
     </div>`;
   }
 
@@ -2117,20 +2126,30 @@ function wireCampRosterModal(){
 /* ================= CAMPEONATO: EVENTOS ================= */
 function updateCampLive(f){
   const arrived = f.rows.filter(r=>r.arrived);
-  let recaudado=0, efectivo=0, nequi=0;
+  let recaudado=0, efectivo=0, nequi=0, recArb=0, recInsc=0;
   arrived.forEach(r=>{
     const deb = rowDebido(r,f);
     const pagado = Math.min(r.dio||0, deb.total);
     recaudado += pagado;
     if(r.modo==='E') efectivo += pagado;
     if(r.modo==='N') nequi += pagado;
+    const arbPagado = Math.min(pagado, deb.arbitraje);
+    const inscPagado = pagado - arbPagado;
+    recArb += arbPagado;
+    recInsc += inscPagado;
   });
   const elR = document.getElementById('campStatRecaudado');
   const elE = document.getElementById('campStatEfectivo');
   const elN = document.getElementById('campStatNequi');
+  const elArb = document.getElementById('campStatRecArb');
+  const elInsc = document.getElementById('campStatRecInsc');
+  const elBruto = document.getElementById('campStatBruto');
   if(elR) elR.textContent = '$'+fmt(recaudado);
   if(elE) elE.textContent = '$'+fmt(efectivo);
   if(elN) elN.textContent = '$'+fmt(nequi);
+  if(elArb) elArb.textContent = '$'+fmt(recArb);
+  if(elInsc) elInsc.textContent = '$'+fmt(recInsc);
+  if(elBruto) elBruto.textContent = '$'+fmt(recArb+recInsc);
 
   f.rows.forEach(r=>{
     const cell = document.getElementById('saldo-'+r.rowId);
