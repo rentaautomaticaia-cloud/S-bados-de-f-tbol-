@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Sábados de Fútbol ⚽</title>
+<title>Fútbol ⚽</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a120b">
 <meta name="mobile-web-app-capable" content="yes">
@@ -46,6 +46,26 @@
     padding-bottom:56px;
   }
   .wrap{max-width:560px;margin:0 auto;padding:0 12px;}
+
+  .col-arb{ width:30px; }
+  .col-insc{ width:32px; }
+  .col-total{ width:34px; }
+
+  .mode-switch{ display:flex; gap:6px; margin-bottom:8px; }
+  .mode-switch button{
+    flex:1; font-family:'JetBrains Mono'; font-weight:700; font-size:10.5px; letter-spacing:0.3px;
+    text-transform:uppercase; padding:8px 4px; border-radius:9px; border:1px solid var(--line);
+    background:var(--surface); color:var(--chalk-dim); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;
+  }
+  .mode-switch button.active{ background:rgba(255,201,77,0.14); border-color:var(--gold); color:var(--gold); }
+
+  .camp-selector-bar{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:var(--surface); border:1px solid var(--line); border-radius:9px;
+    padding:8px 11px; margin-bottom:8px; cursor:pointer;
+  }
+  .camp-selector-bar .csb-name{ font-weight:700; font-size:12.5px; color:var(--gold); }
+  .camp-selector-bar .csb-chevron{ font-size:11px; color:var(--chalk-dim); font-family:'JetBrains Mono'; }
 
   .topline{display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:5px;}
   .mini-title{
@@ -113,25 +133,25 @@
     overflow-x:auto; overflow-y:auto; max-height:66vh; max-height:calc(100vh - 178px); max-height:calc(100dvh - 178px);
     -webkit-overflow-scrolling:touch;
   }
-  table.sheet{ border-collapse:separate; border-spacing:0; width:100%; font-size:10.5px; table-layout:fixed; }
+  table.sheet{ border-collapse:separate; border-spacing:0; width:100%; font-size:11px; table-layout:fixed; }
   table.sheet thead th{
     position:sticky; top:0; z-index:3;
     background:#10151c; color:var(--gold); font-family:'JetBrains Mono'; font-weight:700;
     font-size:9px; text-transform:uppercase; letter-spacing:0.3px;
-    padding:4px 2px; text-align:center; border-bottom:1px solid var(--line); white-space:nowrap;
+    padding:5px 3px; text-align:center; border-bottom:1px solid var(--line); white-space:nowrap;
   }
-  table.sheet thead th.th-name{ text-align:left; padding-left:6px; }
-  table.sheet td{ padding:1.5px 2px; text-align:center; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+  table.sheet thead th.th-name{ text-align:left; padding-left:8px; }
+  table.sheet td{ padding:4px 3px; text-align:center; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
   table.sheet tbody tr:hover td{ background:rgba(255,255,255,0.02); }
 
-  .col-num{ width:18px; }
-  .col-name{ width:82px; text-align:left !important; padding-left:6px !important; max-width:82px; }
-  .col-ll{ width:24px; }
-  .col-gp{ width:26px; }
-  .col-pago{ width:34px; }
-  .col-dio{ width:44px; }
-  .col-vta{ width:40px; }
-  .col-md{ width:22px; }
+  .col-num{ width:16px; }
+  .col-name{ width:120px; text-align:left !important; padding-left:8px !important; max-width:120px; }
+  .col-ll{ width:22px; }
+  .col-gp{ width:24px; }
+  .col-pago{ width:32px; }
+  .col-dio{ width:42px; }
+  .col-vta{ width:38px; }
+  .col-md{ width:20px; }
 
   .sticky-col{ position:sticky; left:0; z-index:2; background:var(--surface); }
   table.sheet thead th.sticky-col{ z-index:4; background:#10151c; }
@@ -145,7 +165,7 @@
 
   .rownum{ font-family:'JetBrains Mono'; font-size:9px; color:var(--chalk-dim); }
   .gk-tag{ font-size:12px; }
-  .rname{ font-weight:600; font-size:10.5px; line-height:1.2; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:78px; }
+  .rname{ font-weight:600; font-size:11px; line-height:1.2; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:116px; }
   .rname .sub{display:block; font-size:9px; color:var(--chalk-dim); font-weight:500;}
 
   .cell-btn{
@@ -162,7 +182,7 @@
 
   .pago-val{ font-family:'JetBrains Mono'; font-size:9px; color:var(--chalk-dim); }
   .dio-input{
-    width:40px; text-align:right; padding:2px 3px; font-family:'JetBrains Mono'; font-size:9.5px;
+    width:36px; text-align:right; padding:2px 3px; font-family:'JetBrains Mono'; font-size:9.5px;
   }
   .dio-input::-webkit-outer-spin-button, .dio-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 
@@ -247,9 +267,61 @@ const DEFAULT_ROSTER = [
   {name:"LeideR", isGK:false},
 ];
 
-let state = { roster: [], weeks: [] };
+const MODE_INFO = {
+  sabado: {
+    key: 'sabado',
+    tabIcon: '🗓️',
+    tabLabel: 'Sábados',
+    titleHtml: '⚽ SÁBADOS<br>DE FÚTBOL ⚽',
+    newBtnLabel: '+ Nuevo sábado',
+    emptyMsg: 'No hay partido activo. Crea el del próximo sábado.',
+    dateLabel: 'Fecha del sábado',
+    defaultHora: '14:00',
+    defaultLugar: 'Torres'
+  },
+  semana: {
+    key: 'semana',
+    tabIcon: '🏆',
+    tabLabel: 'Campeonato',
+    titleHtml: '🏆 CAMPEONATO<br>ENTRE SEMANA 🏆',
+    newBtnLabel: '+ Nueva fecha',
+    emptyMsg: 'No hay fecha activa. Crea la próxima fecha del campeonato.',
+    dateLabel: 'Datos de la fecha',
+    defaultHora: '20:00',
+    defaultLugar: 'El Peñón'
+  }
+};
+
+let state = { data: { sabado: { roster: [], weeks: [] }, semana: { campeonatos: [], activeId: null } } };
+let mode = "sabado";
 let tab = "sabado";
+let campTab = "fechas";
 let historyViewId = null;
+
+function modeInfo(){ return MODE_INFO[mode]; }
+function data(){ return state.data[mode]; }
+function roster(){
+  if(mode==='semana'){
+    const c = activeCampeonato();
+    return c ? c.roster : [];
+  }
+  return data().roster;
+}
+function semanaData(){ return state.data.semana; }
+function activeCampeonato(){
+  const sd = semanaData();
+  if(!sd.campeonatos || sd.campeonatos.length===0) return null;
+  return sd.campeonatos.find(c=>c.id===sd.activeId) || sd.campeonatos[0];
+}
+function newCampeonato(nombre){
+  const sd = semanaData();
+  const c = { id: uid(), nombre: (nombre||'').trim() || `Campeonato ${sd.campeonatos.length+1}`, roster: [], config: null, fechas: [] };
+  sd.campeonatos.push(c);
+  sd.activeId = c.id;
+  return c;
+}
+function weeksArr(){ return data().weeks; }
+function setWeeksArr(arr){ data().weeks = arr; }
 
 const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
 const MAX_GK = 2;
@@ -292,18 +364,87 @@ async function storageSet(key, value){
   return ok;
 }
 
+function ensureWeekDefaults(w, modeKey){
+  const info = MODE_INFO[modeKey] || MODE_INFO.sabado;
+  if(!w.hora) w.hora = info.defaultHora;
+  if(!w.lugar) w.lugar = info.defaultLugar;
+}
+
 async function loadData(){
   try{
     const raw = await storageGet(STORAGE_KEY);
     if(raw){
-      state = JSON.parse(raw);
-      if(!state.roster) state.roster = [];
-      if(!state.weeks) state.weeks = [];
+      const parsed = JSON.parse(raw);
+      let sabadoPart;
+
+      // ---- Sábados: nunca cambia su formato (roster + weeks) ----
+      if(parsed && parsed.data && parsed.data.sabado){
+        sabadoPart = parsed.data.sabado;
+      } else if(parsed && (parsed.roster || parsed.weeks)){
+        // Formato antiguo de una sola cancha (previo a los modos)
+        sabadoPart = { roster: parsed.roster || [], weeks: parsed.weeks || [] };
+      } else {
+        sabadoPart = { roster: DEFAULT_ROSTER.map(p=>({id:uid(), ...p})), weeks: [] };
+      }
+      if(!Array.isArray(sabadoPart.roster)) sabadoPart.roster = [];
+      if(!Array.isArray(sabadoPart.weeks)) sabadoPart.weeks = [];
+      sabadoPart.weeks.forEach(w=>ensureWeekDefaults(w,'sabado'));
+
+      // ---- Entre semana: uno o más campeonatos (cada uno con su roster + config + fechas) ----
+      const oldSemana = (parsed && parsed.data && parsed.data.semana) ? parsed.data.semana : null;
+      let semanaCampeonatos, semanaActiveId;
+
+      function normalizeCampeonato(c, nombreDefault){
+        const camp = {
+          id: c.id || uid(),
+          nombre: c.nombre || nombreDefault,
+          roster: Array.isArray(c.roster) ? c.roster : [],
+          config: c.config || null,
+          fechas: Array.isArray(c.fechas) ? c.fechas : []
+        };
+        camp.fechas.forEach(f=>{
+          ensureWeekDefaults(f,'semana');
+          if(f.rival===undefined) f.rival = '';
+          if(f.resultado===undefined) f.resultado = null;
+          if(f.golesFavor===undefined) f.golesFavor = 0;
+          if(f.golesContra===undefined) f.golesContra = 0;
+        });
+        if(camp.config && !camp.config.nombreEquipo) camp.config.nombreEquipo = 'Banda del Rey';
+        return camp;
+      }
+
+      if(oldSemana && Array.isArray(oldSemana.campeonatos)){
+        // Ya está en formato multi-campeonato
+        semanaCampeonatos = oldSemana.campeonatos.map((c,i)=>normalizeCampeonato(c, `Campeonato ${i+1}`));
+        semanaActiveId = oldSemana.activeId && semanaCampeonatos.some(c=>c.id===oldSemana.activeId)
+          ? oldSemana.activeId : (semanaCampeonatos[0] ? semanaCampeonatos[0].id : null);
+      } else if(oldSemana && Array.isArray(oldSemana.fechas)){
+        // Formato de un solo campeonato -> se convierte en el primero de la lista
+        const camp = normalizeCampeonato(oldSemana, 'Campeonato 1');
+        semanaCampeonatos = [camp];
+        semanaActiveId = camp.id;
+      } else if(oldSemana){
+        // Formato aún más antiguo (partido normal tipo sábado) -> se conserva el plantel
+        const camp = normalizeCampeonato({ roster: oldSemana.roster }, 'Campeonato 1');
+        semanaCampeonatos = [camp];
+        semanaActiveId = camp.id;
+      } else {
+        const camp = normalizeCampeonato({}, 'Campeonato 1');
+        semanaCampeonatos = [camp];
+        semanaActiveId = camp.id;
+      }
+      const semanaPart = { campeonatos: semanaCampeonatos, activeId: semanaActiveId };
+
+      state = { data: { sabado: sabadoPart, semana: semanaPart } };
       return;
     }
     throw new Error('no data');
   }catch(e){
-    state = { roster: DEFAULT_ROSTER.map(p=>({id:uid(), ...p})), weeks: [] };
+    const camp = { id: uid(), nombre: 'Campeonato 1', roster: [], config: null, fechas: [] };
+    state = { data: {
+      sabado: { roster: DEFAULT_ROSTER.map(p=>({id:uid(), ...p})), weeks: [] },
+      semana: { campeonatos: [camp], activeId: camp.id }
+    } };
     await saveData();
   }
 }
@@ -320,15 +461,24 @@ function showToast(msg){
   window.__toastT = setTimeout(()=>t.classList.remove('show'), 1700);
 }
 
+function fmtHora12(hhmm){
+  if(!hhmm) return '';
+  const parts = String(hhmm).split(':');
+  let h = parseInt(parts[0],10)||0;
+  const m = parseInt(parts[1],10)||0;
+  const period = h>=12 ? 'pm' : 'am';
+  let h12 = h % 12; if(h12===0) h12 = 12;
+  return m===0 ? `${h12} ${period}` : `${h12}:${String(m).padStart(2,'0')} ${period}`;
+}
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function fmtDateLong(iso){ const d = new Date(iso+"T12:00:00"); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; }
 function fmtDateShort(iso){ const d = new Date(iso+"T12:00:00"); return { dow: DOW[d.getDay()], num: d.getDate(), mon: MONTHS[d.getMonth()] }; }
 
 function getCurrentWeek(){
-  return state.weeks.find(w=>w.phase!=='finalizado') || null;
+  return weeksArr().find(w=>w.phase!=='finalizado') || null;
 }
 function activeWeek(){
-  return historyViewId ? state.weeks.find(x=>x.id===historyViewId) : getCurrentWeek();
+  return historyViewId ? weeksArr().find(x=>x.id===historyViewId) : getCurrentWeek();
 }
 
 function makeRow(rp, opts={}){
@@ -336,9 +486,182 @@ function makeRow(rp, opts={}){
 }
 
 function newWeek(){
-  state.weeks.push({ id: uid(), date: todayISO(), phase: 'armando', rows: [] });
+  weeksArr().push({ id: uid(), date: todayISO(), phase: 'armando', rows: [], hora: modeInfo().defaultHora, lugar: modeInfo().defaultLugar });
   saveData(); render();
 }
+
+/* ================= CAMPEONATO (modo Entre semana) ================= */
+function campConfig(){ const c = activeCampeonato(); return c ? c.config : null; }
+function campFechas(){ const c = activeCampeonato(); return c ? c.fechas : []; }
+function setCampFechas(arr){ const c = activeCampeonato(); if(c) c.fechas = arr; }
+
+function getCurrentFecha(){
+  return campFechas().find(f=>f.phase!=='finalizado') || null;
+}
+function activeFecha(){
+  return historyViewId ? campFechas().find(x=>x.id===historyViewId) : getCurrentFecha();
+}
+function fechaIndex(f){ return campFechas().findIndex(x=>x.id===f.id); }
+
+function makeCampRow(rp, opts={}){
+  return { rowId: uid(), playerId: rp.id, name: rp.name, isGK: !!rp.isGK, arrived: !!opts.arrived, dio:0, modo:'E' };
+}
+
+function newFecha(){
+  campFechas().push({ id: uid(), date: todayISO(), phase: 'armando', rows: [], hora: modeInfo().defaultHora, lugar: modeInfo().defaultLugar, rival:'', resultado:null, golesFavor:0, golesContra:0 });
+  saveData(); render();
+}
+
+function roundUpTo(value, increment){
+  increment = increment || 500;
+  if(value<=0) return 0;
+  return Math.ceil(value/increment)*increment;
+}
+
+function campFieldArrived(f){ return f.rows.filter(r=>r.arrived && !r.isGK); }
+function campGkArrived(f){ return f.rows.filter(r=>r.arrived && r.isGK); }
+
+// La inscripción se reparte entre TODOS los jugadores de campo del plantel del campeonato
+// (asistan o no ese día puntual), no solo entre los que llegaron a una fecha específica.
+// Si entra un jugador nuevo, la cuota de todos se reajusta automáticamente porque este
+// cálculo siempre se hace en vivo con el tamaño actual del plantel.
+function campFieldRosterCount(){
+  return roster().filter(p=>!p.isGK).length;
+}
+// Cuánto le corresponde a cada jugador en TOTAL durante todo el campeonato
+function campPlayerInscripcionQuota(){
+  const cfg = campConfig();
+  if(!cfg) return 0;
+  const n = campFieldRosterCount();
+  if(n===0) return 0;
+  return cfg.inscripcionTotal / n;
+}
+// Cuota fija por fecha (la misma para todos los jugadores de campo, sin importar
+// cuántos hayan llegado ese día específico)
+function campPlayerInscripcionInstallment(){
+  const cfg = campConfig();
+  if(!cfg) return 0;
+  const quota = campPlayerInscripcionQuota();
+  if(quota<=0) return 0;
+  return roundUpTo(quota / cfg.numFechas, cfg.redondeo);
+}
+
+// Insc: cuota fija por fecha (no depende de la fecha en sí, es la misma para todo el plantel)
+function fechaInscripcionPorJugador(f){
+  return campPlayerInscripcionInstallment();
+}
+// Arbitraje: se sigue dividiendo solo entre quienes llegaron ESE día. No lleva registro
+// histórico -- se recoge y se paga el mismo día, punto.
+function fechaArbitrajePorJugador(f){
+  const cfg = campConfig();
+  if(!cfg) return 0;
+  const field = campFieldArrived(f);
+  if(field.length===0) return 0;
+  return roundUpTo(cfg.arbitraje / field.length, cfg.redondeo);
+}
+
+// Lo que debe pagar un jugador puntual en una fecha puntual
+function rowDebido(r, f){
+  if(!r.arrived || r.isGK) return { arbitraje:0, inscripcion:0, total:0 };
+  const arb = fechaArbitrajePorJugador(f);
+  const insc = fechaInscripcionPorJugador(f);
+  return { arbitraje: arb, inscripcion: insc, total: arb+insc };
+}
+function rowSaldo(r, f){
+  const deb = rowDebido(r, f);
+  return (r.dio||0) - deb.total;
+}
+
+// Totales y tabla financiera del campeonato completo
+function resultBadgeHtml(f){
+  if(!f.resultado) return '';
+  const map = { G: {txt:'Ganó', color:'var(--win)'}, P: {txt:'Perdió', color:'var(--lose)'}, E: {txt:'Empató', color:'var(--gold)'} };
+  const r = map[f.resultado];
+  if(!r) return '';
+  const marcador = `${f.golesFavor||0}-${f.golesContra||0}`;
+  return ` <span style="font-weight:700; color:${r.color};">${r.txt} ${marcador}</span>`;
+}
+function campEquipoNombre(){
+  const cfg = campConfig();
+  return (cfg && cfg.nombreEquipo) || 'Banda del Rey';
+}
+function campMarcadorLine(f){
+  if(!f.rival) return '';
+  const equipo = campEquipoNombre();
+  if(f.resultado){
+    const map = { G:'var(--win)', P:'var(--lose)', E:'var(--gold)' };
+    const color = map[f.resultado] || 'var(--chalk-dim)';
+    return `<b>${escapeHtml(equipo)}</b> <span style="color:${color}; font-weight:800;">${f.golesFavor||0} - ${f.golesContra||0}</span> ${escapeHtml(f.rival)}`;
+  }
+  return `<b>${escapeHtml(equipo)}</b> vs ${escapeHtml(f.rival)}`;
+}
+
+function campMatchStats(){
+  const fechas = campFechas().filter(f=>f.phase==='finalizado' && f.resultado);
+  let g=0,p=0,e=0,gf=0,gc=0;
+  fechas.forEach(f=>{
+    if(f.resultado==='G') g++;
+    else if(f.resultado==='P') p++;
+    else if(f.resultado==='E') e++;
+    gf += f.golesFavor||0;
+    gc += f.golesContra||0;
+  });
+  const puntos = g*2 + e*1;
+  return { jugados: fechas.length, g, p, e, puntos, gf, gc, dg: gf-gc };
+}
+
+function campTotals(){
+  const cfg = campConfig();
+  const fechas = campFechas();
+  const players = {};
+  roster().forEach(p=>{ players[p.id] = { id:p.id, name:p.name, isGK:!!p.isGK, insc:0, fechasJugadas:0 }; });
+
+  let inscripcionRecaudadaTotal = 0;
+
+  fechas.forEach(f=>{
+    if(!cfg) return;
+    const arbPer = fechaArbitrajePorJugador(f);
+    f.rows.forEach(r=>{
+      if(!r.arrived || r.isGK) return;
+      const dio = r.dio||0;
+      // El arbitraje se cobra primero (es del día, no lleva registro), el resto va a inscripción
+      const aporteInsc = Math.max(0, dio - arbPer);
+      const pl = players[r.playerId];
+      if(pl){
+        pl.insc += aporteInsc;
+        pl.fechasJugadas += 1;
+      }
+      inscripcionRecaudadaTotal += aporteInsc;
+    });
+  });
+
+  const quota = campPlayerInscripcionQuota();
+  const installment = campPlayerInscripcionInstallment();
+  const fechasTranscurridas = cfg ? Math.min(fechas.length, cfg.numFechas) : 0;
+
+  Object.values(players).forEach(pl=>{
+    if(pl.isGK){ pl.leToca = 0; pl.debeInsc = 0; return; }
+    // La inscripción es una cuota fija del jugador (le toque o no jugar cada fecha puntual);
+    // se va "activando" a medida que avanzan las fechas del campeonato, sin pasarse de su cuota total.
+    pl.leToca = Math.min(quota, installment * fechasTranscurridas);
+    pl.debeInsc = pl.leToca - pl.insc;
+  });
+
+  const inscripcionTotal = cfg ? cfg.inscripcionTotal : 0;
+  const inscripcionPendienteTotal = Math.max(0, inscripcionTotal - inscripcionRecaudadaTotal);
+  const fechasJugadas = fechas.filter(f=>f.phase==='finalizado').length;
+  const fechasRestantes = cfg ? Math.max(0, cfg.numFechas - fechasJugadas) : 0;
+  const numJugadoresCampo = campFieldRosterCount();
+  const excedente = cfg ? Math.max(0, (installment*cfg.numFechas*numJugadoresCampo) - inscripcionTotal) : 0;
+
+  return {
+    players: Object.values(players),
+    excedente, inscripcionRecaudadaTotal, inscripcionPendienteTotal,
+    inscripcionTotal, fechasJugadas, fechasRestantes,
+    cuotaPorJugador: quota, cuotaPorFecha: installment, numJugadoresCampo
+  };
+}
+
 
 /* ---------- payment calc ---------- */
 function calcOwed(r){
@@ -381,17 +704,41 @@ function render(){
   };
 
   const app = document.getElementById('app');
+  const tabbarHtml = mode==='sabado'
+    ? `<div class="tabbar">
+        <button data-tab="sabado" class="${tab==='sabado'?'active':''}"><span class="ico">⚽</span>Partido</button>
+        <button data-tab="historial" class="${tab==='historial'?'active':''}"><span class="ico">📋</span>Historial</button>
+      </div>`
+    : `<div class="tabbar">
+        <button data-camptab="fechas" class="${campTab==='fechas'?'active':''}"><span class="ico">🏟️</span>Fechas</button>
+        <button data-camptab="finanzas" class="${campTab==='finanzas'?'active':''}"><span class="ico">💰</span>Finanzas</button>
+        <button data-camptab="historial" class="${campTab==='historial'?'active':''}"><span class="ico">📋</span>Historial</button>
+        <button data-camptab="estadistica" class="${campTab==='estadistica'?'active':''}"><span class="ico">📊</span>Estadística</button>
+      </div>`;
   app.innerHTML = `
-    <div class="wrap content" id="content"></div>
-    <div class="tabbar">
-      <button data-tab="sabado" class="${tab==='sabado'?'active':''}"><span class="ico">⚽</span>Partido</button>
-      <button data-tab="historial" class="${tab==='historial'?'active':''}"><span class="ico">📋</span>Historial</button>
+    <div class="wrap content" id="content">
+      <div class="mode-switch">
+        <button data-mode="sabado" class="${mode==='sabado'?'active':''}">${MODE_INFO.sabado.tabIcon} ${MODE_INFO.sabado.tabLabel}</button>
+        <button data-mode="semana" class="${mode==='semana'?'active':''}">${MODE_INFO.semana.tabIcon} ${MODE_INFO.semana.tabLabel}</button>
+      </div>
+      ${mode==='semana' ? campeonatoSelectorBarHtml() : ''}
+      <div id="modeContent"></div>
     </div>
+    ${tabbarHtml}
   `;
-  document.querySelectorAll('.tabbar button').forEach(b=>{ b.onclick = ()=>{ tab=b.dataset.tab; historyViewId=null; render(); }; });
-  const content = document.getElementById('content');
-  content.innerHTML = tab==='sabado' ? renderSabado() : renderHistorial();
-  wireEvents();
+  document.querySelectorAll('.tabbar [data-tab]').forEach(b=>{ b.onclick = ()=>{ tab=b.dataset.tab; historyViewId=null; render(); }; });
+  document.querySelectorAll('.tabbar [data-camptab]').forEach(b=>{ b.onclick = ()=>{ campTab=b.dataset.camptab; historyViewId=null; render(); }; });
+  document.querySelectorAll('.mode-switch button').forEach(b=>{ b.onclick = ()=>{ if(mode!==b.dataset.mode){ mode=b.dataset.mode; tab='sabado'; campTab='fechas'; historyViewId=null; render(); } }; });
+  const campSelectorBtn = document.getElementById('campeonatoSelectorBtn');
+  if(campSelectorBtn) campSelectorBtn.onclick = ()=>{ openModal(campeonatoSwitcherModalHtml()); wireCampeonatoSwitcherModal(); };
+  const content = document.getElementById('modeContent');
+  if(mode==='sabado'){
+    content.innerHTML = tab==='sabado' ? renderSabado() : renderHistorial();
+    wireEvents();
+  } else {
+    content.innerHTML = renderCampeonato();
+    wireCampeonatoEvents();
+  }
 
   requestAnimationFrame(()=>{
     window.scrollTo(0, savedScroll.win);
@@ -405,10 +752,11 @@ function phaseLabel(phase){ return phase==='armando' ? 'Armando lista' : phase==
 function renderSabado(){
   const w = activeWeek();
   const readOnly = !!historyViewId;
+  const info = modeInfo();
 
   if(!w){
-    return `<div class="empty"><span class="ico">⚽</span><p>No hay partido activo. Crea el del próximo sábado.</p>
-      <button class="btn btn-gold" id="newWeekBtn">+ Nuevo sábado</button></div>`;
+    return `<div class="empty"><span class="ico">⚽</span><p>${info.emptyMsg}</p>
+      <button class="btn btn-gold" id="newWeekBtn">${info.newBtnLabel}</button></div>`;
   }
 
   let html = '';
@@ -421,16 +769,17 @@ function renderSabado(){
       <button class="btn btn-danger" id="deleteThisWeekBtn" style="flex:0 0 auto;">🗑</button>
     </div>`;
     if(w.phase==='finalizado' && currentActive){
-      html += `<div class="empty" style="padding:6px 0 14px;"><p style="margin:0;">Tienes otro sábado activo. Termínalo antes de reabrir este.</p></div>`;
+      html += `<div class="empty" style="padding:6px 0 14px;"><p style="margin:0;">Tienes otro partido activo. Termínalo antes de reabrir este.</p></div>`;
     }
   }
 
   html += `<div class="topline">
     <div>
       <div class="eyebrow">${fmtDateLong(w.date)}</div>
+      <div style="font-size:11px; color:var(--chalk-dim); margin-top:2px;">🕒 ${fmtHora12(w.hora||info.defaultHora)} · 📍 ${escapeHtml(w.lugar||info.defaultLugar)}</div>
       <span class="phase-chip phase-${w.phase}">${phaseLabel(w.phase)}</span>
     </div>
-    <div class="mini-title">⚽ SÁBADOS<br>DE FÚTBOL ⚽</div>
+    <div class="mini-title">${info.titleHtml}</div>
     <div style="display:flex; gap:6px;">
       ${!readOnly ? `<button class="btn btn-outline btn-xs" id="changeDateBtn">📅</button>` : ''}
       ${!readOnly ? `<button class="btn btn-outline btn-xs" id="editRosterBtn">✎ Plantel</button>` : ''}
@@ -545,11 +894,11 @@ function renderSheet(w, cellsLocked, showAdd){
 }
 
 function renderHistorial(){
-  const finished = state.weeks.filter(w=>w.phase==='finalizado').slice().reverse();
+  const finished = weeksArr().filter(w=>w.phase==='finalizado').slice().reverse();
   if(finished.length===0){
-    return `<div class="empty"><span class="ico">📋</span><p>Todavía no hay sábados finalizados.</p></div>`;
+    return `<div class="empty"><span class="ico">📋</span><p>Todavía no hay partidos finalizados en ${modeInfo().tabLabel.toLowerCase()}.</p></div>`;
   }
-  let html = `<div class="eyebrow" style="margin-bottom:8px;">Historial · ${finished.length} sábado${finished.length>1?'s':''}</div>`;
+  let html = `<div class="eyebrow" style="margin-bottom:8px;">Historial ${modeInfo().tabLabel} · ${finished.length} partido${finished.length>1?'s':''}</div>`;
   finished.forEach(w=>{
     const d = fmtDateShort(w.date);
     const arrived = w.rows.filter(r=>r.arrived);
@@ -572,11 +921,11 @@ function weekPlayerPickerModal(w){
   const inWeek = new Set(w.rows.map(r=>r.playerId));
   let html = `<div class="modal-bg" id="modalBg"><div class="modal">
     <h3>Convocar desde plantel</h3>
-    <p>Toca para agregar o quitar del sábado de hoy.</p>
+    <p>Toca para agregar o quitar del partido de hoy.</p>
     <input type="text" id="pickerSearch" placeholder="Buscar..." style="width:100%; margin-bottom:10px;">
     <div id="pickerList">`;
-  const gk = state.roster.filter(p=>p.isGK);
-  const field = state.roster.filter(p=>!p.isGK);
+  const gk = roster().filter(p=>p.isGK);
+  const field = roster().filter(p=>!p.isGK);
   function prow(p){
     const sel = inWeek.has(p.id);
     return `<div class="roster-row" data-pick-name="${escapeAttr(p.name.toLowerCase())}" data-pick="${p.id}" style="cursor:pointer;">
@@ -586,7 +935,7 @@ function weekPlayerPickerModal(w){
   }
   if(gk.length) html += gk.map(prow).join('');
   if(field.length) html += field.map(prow).join('');
-  if(state.roster.length===0) html += `<p>Tu plantel está vacío. Agrega jugadores desde "✎ Plantel".</p>`;
+  if(roster().length===0) html += `<p>Tu plantel está vacío. Agrega jugadores desde "✎ Plantel".</p>`;
   html += `</div>
     <div class="modal-actions">
       <button class="btn btn-gold btn-block" id="closePickerBtn">Listo</button>
@@ -597,10 +946,10 @@ function weekPlayerPickerModal(w){
 
 function rosterEditorModal(){
   const w = getCurrentWeek();
-  const convocados = w ? w.rows.map(r=>state.roster.find(p=>p.id===r.playerId)).filter(p=>p && p.phone) : [];
+  const convocados = w ? w.rows.map(r=>roster().find(p=>p.id===r.playerId)).filter(p=>p && p.phone) : [];
   let html = `<div class="modal-bg" id="modalBg"><div class="modal">
-    <h3>Plantel</h3>
-    <p>${w ? 'Toca "+ Hoy" para convocar a alguien al sábado activo.' : 'Crea un sábado en la pestaña Partido para poder convocar desde aquí.'}</p>
+    <h3>Plantel · ${modeInfo().tabLabel}</h3>
+    <p>${w ? 'Toca "+ Hoy" para convocar a alguien al partido activo.' : 'Crea un partido en la pestaña Partido para poder convocar desde aquí.'}</p>
     <div id="bulkReminderBox" style="margin-bottom:10px;">
       ${w ? (convocados.length>0
         ? `<button class="btn btn-wsp btn-block" id="bulkWspBtn">📢 Recordar a todos los convocados (${convocados.length})</button>`
@@ -608,7 +957,7 @@ function rosterEditorModal(){
       : ''}
     </div>
     <div id="rosterList">`;
-  state.roster.forEach(p=>{
+  roster().forEach(p=>{
     const inWeek = w && w.rows.some(r=>r.playerId===p.id);
     html += `<div class="roster-row">
       <input type="text" data-roster-name="${p.id}" value="${escapeAttr(p.name)}">
@@ -649,16 +998,27 @@ function wireEvents(){
   const changeDateBtn = q('#changeDateBtn');
   if(changeDateBtn) changeDateBtn.onclick = ()=>{
     const w = getCurrentWeek();
+    const info = modeInfo();
     openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
-      <h3>Fecha del sábado</h3>
-      <input type="date" id="dateInput" value="${w.date}" style="width:100%;">
+      <h3>${info.dateLabel}</h3>
+      <p style="margin-bottom:6px;">Fecha</p>
+      <input type="date" id="dateInput" value="${w.date}" style="width:100%; margin-bottom:12px;">
+      <p style="margin-bottom:6px;">Hora</p>
+      <input type="time" id="horaInput" value="${w.hora||info.defaultHora}" style="width:100%; margin-bottom:12px;">
+      <p style="margin-bottom:6px;">Lugar</p>
+      <input type="text" id="lugarInput" value="${escapeAttr(w.lugar||info.defaultLugar)}" placeholder="${info.defaultLugar}" style="width:100%;">
       <div class="modal-actions">
         <button class="btn btn-outline btn-block" id="cancelDateBtn">Cancelar</button>
         <button class="btn btn-gold btn-block" id="saveDateBtn">Guardar</button>
       </div>
     </div></div>`);
     q('#cancelDateBtn').onclick = closeModal;
-    q('#saveDateBtn').onclick = ()=>{ w.date = q('#dateInput').value || w.date; saveData(); closeModal(); render(); };
+    q('#saveDateBtn').onclick = ()=>{
+      w.date = q('#dateInput').value || w.date;
+      w.hora = q('#horaInput').value || w.hora;
+      w.lugar = (q('#lugarInput').value||'').trim() || w.lugar;
+      saveData(); closeModal(); render();
+    };
   };
 
   const editRosterBtn = q('#editRosterBtn');
@@ -681,7 +1041,7 @@ function wireEvents(){
 
   const reopenWeekBtn = q('#reopenWeekBtn');
   if(reopenWeekBtn) reopenWeekBtn.onclick = ()=>{
-    const w = state.weeks.find(x=>x.id===historyViewId);
+    const w = weeksArr().find(x=>x.id===historyViewId);
     if(!w) return;
     w.phase = 'jugando';
     historyViewId = null;
@@ -692,9 +1052,9 @@ function wireEvents(){
   const deleteThisWeekBtn = q('#deleteThisWeekBtn');
   if(deleteThisWeekBtn) deleteThisWeekBtn.onclick = ()=>{
     const id = historyViewId;
-    const w = state.weeks.find(x=>x.id===id);
+    const w = weeksArr().find(x=>x.id===id);
     openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
-      <h3>¿Eliminar este sábado?</h3>
+      <h3>¿Eliminar este partido?</h3>
       <p>${w ? fmtDateLong(w.date) : ''} — esta acción no se puede deshacer.</p>
       <div class="modal-actions">
         <button class="btn btn-outline btn-block" id="cancelDeleteWeekBtn">Cancelar</button>
@@ -703,7 +1063,7 @@ function wireEvents(){
     </div></div>`);
     q('#cancelDeleteWeekBtn').onclick = closeModal;
     q('#confirmDeleteWeekBtn').onclick = ()=>{
-      state.weeks = state.weeks.filter(x=>x.id!==id);
+      setWeeksArr(weeksArr().filter(x=>x.id!==id));
       historyViewId = null;
       saveData(); closeModal(); tab='historial'; render(); showToast('Partido eliminado');
     };
@@ -715,9 +1075,9 @@ function wireEvents(){
     btn.onclick = (e)=>{
       e.stopPropagation();
       const id = btn.dataset.deleteWeek;
-      const w = state.weeks.find(x=>x.id===id);
+      const w = weeksArr().find(x=>x.id===id);
       openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
-        <h3>¿Eliminar este sábado?</h3>
+        <h3>¿Eliminar este partido?</h3>
         <p>${w ? fmtDateLong(w.date) : ''} — esta acción no se puede deshacer.</p>
         <div class="modal-actions">
           <button class="btn btn-outline btn-block" id="cancelDeleteWeekBtn">Cancelar</button>
@@ -726,7 +1086,7 @@ function wireEvents(){
       </div></div>`);
       q('#cancelDeleteWeekBtn').onclick = closeModal;
       q('#confirmDeleteWeekBtn').onclick = ()=>{
-        state.weeks = state.weeks.filter(x=>x.id!==id);
+        setWeeksArr(weeksArr().filter(x=>x.id!==id));
         saveData(); closeModal(); render(); showToast('Partido eliminado');
       };
     };
@@ -816,8 +1176,8 @@ function wireEvents(){
       showToast(isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
       return;
     }
-    let rp = state.roster.find(p=>p.name.toLowerCase()===name.toLowerCase());
-    if(!rp){ rp = {id:uid(), name, isGK}; state.roster.push(rp); }
+    let rp = roster().find(p=>p.name.toLowerCase()===name.toLowerCase());
+    if(!rp){ rp = {id:uid(), name, isGK}; roster().push(rp); }
     w.rows.push(makeRow(rp, {arrived:true}));
     saveData(); render();
     setTimeout(()=>{ const i=q('#quickAddInput'); if(i) i.focus(); }, 0);
@@ -838,7 +1198,7 @@ function wirePickerModal(w){
       if(idx>=0){
         w.rows.splice(idx,1);
       } else {
-        const rp = state.roster.find(p=>p.id===id);
+        const rp = roster().find(p=>p.id===id);
         if(!rp) return;
         if(!canAddToWeek(w, rp.isGK)){
           showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
@@ -865,7 +1225,11 @@ function wirePickerModal(w){
 
 function buildWspMessage(name){
   const primerNombre = (name||'').trim().split(' ')[0];
-  return `Eyy ${primerNombre} ⚽, te recuerdo el partido a las 2 pm. En Torres. Ojo puntual ⏰.
+  const info = modeInfo();
+  const w = mode==='sabado' ? getCurrentWeek() : getCurrentFecha();
+  const horaTxt = fmtHora12((w && w.hora) || info.defaultHora);
+  const lugarTxt = (w && w.lugar) || info.defaultLugar;
+  return `Eyy ${primerNombre} ⚽, te recuerdo el partido a las ${horaTxt}. En ${lugarTxt}. Ojo puntual ⏰.
 Confirmando ✅`;
 }
 function sendWsp(p){
@@ -873,6 +1237,7 @@ function sendWsp(p){
 
   const phone = String(p.phone).replace(/[^0-9]/g,'');
   const text = encodeURIComponent(buildWspMessage(p.name));
+
 
   // Intent de Android: fuerza el paquete de WhatsApp normal
   // (com.whatsapp), evitando que se abra WhatsApp Business.
@@ -924,7 +1289,7 @@ function wireRosterModal(){
 
   qa('[data-roster-name]').forEach(inp=>{
     inp.onchange = ()=>{
-      const p = state.roster.find(x=>x.id===inp.dataset.rosterName);
+      const p = roster().find(x=>x.id===inp.dataset.rosterName);
       p.name = inp.value.trim() || p.name;
       const w = getCurrentWeek();
       if(w){ w.rows.filter(r=>r.playerId===p.id).forEach(r=> r.name = p.name); }
@@ -933,7 +1298,7 @@ function wireRosterModal(){
   });
   qa('[data-roster-gk]').forEach(btn=>{
     btn.onclick = ()=>{
-      const p = state.roster.find(x=>x.id===btn.dataset.rosterGk);
+      const p = roster().find(x=>x.id===btn.dataset.rosterGk);
       p.isGK = !p.isGK;
       saveData();
       btn.className = 'btn btn-xs ' + (p.isGK?'btn-gold':'btn-outline');
@@ -943,7 +1308,7 @@ function wireRosterModal(){
   qa('[data-roster-remove]').forEach(btn=>{
     btn.onclick = ()=>{
       const pid = btn.dataset.rosterRemove;
-      state.roster = state.roster.filter(x=>x.id!==pid);
+      data().roster = roster().filter(x=>x.id!==pid);
       const w = getCurrentWeek();
       if(w) w.rows = w.rows.filter(r=>r.playerId!==pid);
       saveData();
@@ -959,7 +1324,7 @@ function wireRosterModal(){
       if(idx>=0){
         w.rows.splice(idx,1);
       } else {
-        const rp = state.roster.find(p=>p.id===pid);
+        const rp = roster().find(p=>p.id===pid);
         if(!rp) return;
         if(!canAddToWeek(w, rp.isGK)){
           showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
@@ -975,14 +1340,14 @@ function wireRosterModal(){
   });
   qa('[data-roster-phone-edit]').forEach(btn=>{
     btn.onclick = ()=>{
-      const p = state.roster.find(x=>x.id===btn.dataset.rosterPhoneEdit);
+      const p = roster().find(x=>x.id===btn.dataset.rosterPhoneEdit);
       if(!p) return;
       openPhoneEditModal(p);
     };
   });
   qa('[data-roster-wsp]').forEach(btn=>{
     btn.onclick = ()=>{
-      const p = state.roster.find(x=>x.id===btn.dataset.rosterWsp);
+      const p = roster().find(x=>x.id===btn.dataset.rosterWsp);
       sendWsp(p);
     };
   });
@@ -1010,7 +1375,7 @@ function wireRosterModal(){
     bulkBtn.onclick = ()=>{
       const w = getCurrentWeek();
       if(!w) return;
-      bulkQueue = w.rows.map(r=>state.roster.find(p=>p.id===r.playerId)).filter(p=>p && p.phone);
+      bulkQueue = w.rows.map(r=>roster().find(p=>p.id===r.playerId)).filter(p=>p && p.phone);
       bulkIndex = 0;
       renderBulkStep();
     };
@@ -1022,7 +1387,7 @@ function wireRosterModal(){
     const name = (inp.value||'').trim();
     if(!name) return;
     const isGK = q('#rosterAddGK').checked;
-    state.roster.push({id:uid(), name, isGK});
+    roster().push({id:uid(), name, isGK});
     saveData();
     closeModal();
     openModal(rosterEditorModal());
@@ -1036,7 +1401,1007 @@ function wireRosterModal(){
   if(closeBtn) closeBtn.onclick = ()=>{ closeModal(); render(); };
 }
 
-function doFinish(w){ w.phase='finalizado'; saveData(); render(); showToast('Sábado finalizado ✓'); }
+/* ================= CAMPEONATO: RENDER ================= */
+function campeonatoSelectorBarHtml(){
+  const c = activeCampeonato();
+  const sd = semanaData();
+  const nombre = c ? c.nombre : 'Sin campeonato';
+  const extra = sd.campeonatos.length>1 ? ` <span style="color:var(--chalk-dim); font-weight:400;">(${sd.campeonatos.length} campeonatos)</span>` : '';
+  return `<div class="camp-selector-bar" id="campeonatoSelectorBtn">
+    <span class="csb-name">🏆 ${escapeHtml(nombre)}${extra}</span>
+    <span class="csb-chevron">▾ cambiar / crear</span>
+  </div>`;
+}
+
+function campeonatoSwitcherModalHtml(){
+  const sd = semanaData();
+  let html = `<div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>🏆 Tus campeonatos</h3>
+    <p>Cada campeonato tiene su propio plantel, configuración, fechas y estadísticas.</p>
+    <div id="campeonatoList">`;
+  sd.campeonatos.forEach(c=>{
+    const active = c.id===sd.activeId;
+    html += `<div class="roster-row">
+      <input type="text" data-campeonato-name="${c.id}" value="${escapeAttr(c.nombre)}" style="flex:1;">
+      ${active
+        ? `<span class="btn btn-xs btn-gold" style="pointer-events:none;">✓ Activo</span>`
+        : `<button class="btn btn-xs btn-outline" data-select-campeonato="${c.id}">Usar</button>`}
+      ${sd.campeonatos.length>1 ? `<button class="btn btn-xs btn-danger" data-delete-campeonato="${c.id}">🗑</button>` : ''}
+    </div>`;
+  });
+  html += `</div>
+    <div style="margin-top:12px; border-top:1px solid var(--line); padding-top:12px;">
+      <p style="margin-bottom:6px;">Crear un campeonato nuevo (independiente)</p>
+      <input type="text" id="newCampeonatoNameInput" placeholder="Ej: Liga Municipal 2026" style="width:100%; margin-bottom:8px;">
+      <button class="btn btn-gold btn-block" id="createCampeonatoBtn">+ Crear nuevo campeonato</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-block" id="closeCampeonatoSwitcherBtn">Cerrar</button>
+    </div>
+  </div></div>`;
+  return html;
+}
+
+function wireCampeonatoSwitcherModal(){
+  const q = sel => document.querySelector(sel);
+  const qa = sel => document.querySelectorAll(sel);
+  const sd = semanaData();
+
+  qa('[data-campeonato-name]').forEach(inp=>{
+    inp.onchange = ()=>{
+      const c = sd.campeonatos.find(x=>x.id===inp.dataset.campeonatoName);
+      if(c) c.nombre = inp.value.trim() || c.nombre;
+      saveData();
+    };
+  });
+
+  qa('[data-select-campeonato]').forEach(btn=>{
+    btn.onclick = ()=>{
+      sd.activeId = btn.dataset.selectCampeonato;
+      saveData(); closeModal();
+      campTab='fechas'; historyViewId=null; render();
+      showToast('Campeonato cambiado ✓');
+    };
+  });
+
+  qa('[data-delete-campeonato]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.dataset.deleteCampeonato;
+      const c = sd.campeonatos.find(x=>x.id===id);
+      openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
+        <h3>¿Eliminar "${escapeHtml(c?c.nombre:'')}"?</h3>
+        <p>Se borrarán su plantel, configuración y todas sus fechas. Esta acción no se puede deshacer.</p>
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-block" id="cancelDeleteCampBtn">Cancelar</button>
+          <button class="btn btn-danger btn-block" id="confirmDeleteCampBtn">Eliminar</button>
+        </div>
+      </div></div>`);
+      q('#cancelDeleteCampBtn').onclick = ()=>{ openModal(campeonatoSwitcherModalHtml()); wireCampeonatoSwitcherModal(); };
+      q('#confirmDeleteCampBtn').onclick = ()=>{
+        sd.campeonatos = sd.campeonatos.filter(x=>x.id!==id);
+        if(sd.activeId===id) sd.activeId = sd.campeonatos[0] ? sd.campeonatos[0].id : null;
+        saveData(); closeModal();
+        campTab='fechas'; historyViewId=null; render();
+        showToast('Campeonato eliminado');
+      };
+    };
+  });
+
+  q('#createCampeonatoBtn').onclick = ()=>{
+    const name = q('#newCampeonatoNameInput').value;
+    newCampeonato(name);
+    saveData(); closeModal();
+    campTab='fechas'; historyViewId=null; render();
+    showToast('Nuevo campeonato creado ✓');
+  };
+
+  q('#closeCampeonatoSwitcherBtn').onclick = closeModal;
+}
+
+function renderCampeonato(){
+  if(!campConfig()) return renderCampConfigSetup();
+  if(campTab==='finanzas') return renderCampFinanzas();
+  if(campTab==='historial') return renderCampHistorialTab();
+  if(campTab==='estadistica') return renderCampEstadisticaTab();
+  return renderCampFechasTab();
+}
+
+function renderCampConfigSetup(){
+  return `<div class="empty">
+    <span class="ico">🏆</span>
+    <p>Configura tu campeonato de Entre Semana: arbitraje, inscripción y número de fechas.</p>
+    <button class="btn btn-gold" id="openCampConfigBtn">⚙️ Configurar campeonato</button>
+  </div>`;
+}
+
+function campConfigSummaryBar(cfg){
+  if(!cfg) return '';
+  const n = campFieldRosterCount();
+  const quota = campPlayerInscripcionQuota();
+  const installment = campPlayerInscripcionInstallment();
+  return `<div class="card" style="margin-top:10px;">
+    <h2 style="font-size:12px;">Config. del campeonato <button class="btn btn-outline btn-xs" id="editCampConfigBtn">⚙️ Editar</button></h2>
+    <div style="font-size:11.5px; color:var(--chalk-dim); line-height:1.7;">
+      Arbitraje: $${fmt(cfg.arbitraje)} por fecha, entre quienes llegaron ese día (no lleva registro)<br>
+      Inscripción: $${fmt(cfg.inscripcionTotal)} repartida entre los ${n} jugadores de campo del plantel → $${fmt(quota)} c/u en ${cfg.numFechas} fechas ($${fmt(installment)} por fecha)<br>
+      Redondeo: múltiplos de $${fmt(cfg.redondeo)}
+    </div>
+  </div>`;
+}
+
+function renderCampFechasTab(){
+  const f = activeFecha();
+  const readOnly = !!historyViewId;
+  const info = modeInfo();
+  const cfg = campConfig();
+
+  let html = '';
+
+  if(!f){
+    html += `<div class="empty"><span class="ico">🏟️</span><p>${info.emptyMsg}</p>
+      <button class="btn btn-gold" id="newFechaBtn">${info.newBtnLabel}</button></div>`;
+    html += campConfigSummaryBar(cfg);
+    return html;
+  }
+
+  if(readOnly){
+    const currentActive = getCurrentFecha();
+    const canReopen = f.phase==='finalizado' && !currentActive;
+    html += `<div class="row" style="gap:8px; margin-bottom:10px;">
+      <button class="btn btn-outline btn-block" id="backToCurrentFechaBtn">${currentActive ? '← Volver a la fecha actual' : '← Volver al historial'}</button>
+      ${canReopen ? `<button class="btn btn-gold" id="reopenFechaBtn" style="flex:0 0 auto;">↺ Reabrir</button>` : ''}
+      <button class="btn btn-danger" id="deleteThisFechaBtn" style="flex:0 0 auto;">🗑</button>
+    </div>`;
+    if(f.phase==='finalizado' && currentActive){
+      html += `<div class="empty" style="padding:6px 0 14px;"><p style="margin:0;">Tienes otra fecha activa. Termínala antes de reabrir esta.</p></div>`;
+    }
+  }
+
+  const idx = fechaIndex(f);
+  html += `<div class="topline">
+    <div>
+      <div class="eyebrow">Fecha ${idx+1} · ${fmtDateLong(f.date)}</div>
+      <div style="font-size:11px; color:var(--chalk-dim); margin-top:2px;">🕒 ${fmtHora12(f.hora||info.defaultHora)} · 📍 ${escapeHtml(f.lugar||info.defaultLugar)}</div>
+      ${f.rival ? `<div style="font-size:11px; margin-top:2px;">⚔️ ${campMarcadorLine(f)}</div>` : ''}
+      <span class="phase-chip phase-${f.phase}">${phaseLabel(f.phase)}</span>
+    </div>
+    <div class="mini-title">${info.titleHtml}</div>
+    <div style="display:flex; gap:6px;">
+      ${!readOnly ? `<button class="btn btn-outline btn-xs" id="editCampConfigTopBtn">⚙️</button>` : ''}
+      <button class="btn btn-outline btn-xs" id="changeFechaBtn">📅</button>
+      ${!readOnly ? `<button class="btn btn-outline btn-xs" id="editCampRosterBtn">✎ Plantel</button>` : ''}
+    </div>
+  </div>`;
+
+  const cellsLocked = f.phase !== 'jugando';
+  const showAdd = !readOnly;
+  const arrived = f.rows.filter(r=>r.arrived);
+
+  if(f.phase==='jugando' && arrived.length>0){
+    let recaudado=0, efectivo=0, nequi=0;
+    arrived.forEach(r=>{
+      const deb = rowDebido(r,f);
+      const pagado = Math.min(r.dio||0, deb.total);
+      recaudado += pagado;
+      if(r.modo==='E') efectivo += pagado;
+      if(r.modo==='N') nequi += pagado;
+    });
+    html += `<div class="stats-strip">
+      <div class="stat-chip gold"><div class="slabel">Total recaudado</div><div class="sval" id="campStatRecaudado">$${fmt(recaudado)}</div></div>
+      <div class="stat-chip"><div class="slabel">Llegaron</div><div class="sval">${arrived.length}/${f.rows.length}</div></div>
+      <div class="stat-chip win"><div class="slabel">Efectivo</div><div class="sval" id="campStatEfectivo">$${fmt(efectivo)}</div></div>
+      <div class="stat-chip win"><div class="slabel">Nequi</div><div class="sval" id="campStatNequi">$${fmt(nequi)}</div></div>
+    </div>`;
+  }
+
+  html += renderCampSheet(f, cellsLocked || readOnly, showAdd);
+
+  if(!readOnly){
+    if(f.phase==='armando'){
+      html += `<button class="btn btn-gold btn-block" id="startFechaBtn" style="margin-top:6px;" ${f.rows.length===0?'disabled':''}>▶ Iniciar fecha</button>`;
+    } else if(f.phase==='jugando'){
+      html += `<button class="btn btn-gold btn-block" id="finishFechaBtn" style="margin-top:6px;">🏁 Finalizar fecha</button>`;
+    }
+  }
+
+  return html;
+}
+
+function renderCampSheet(f, cellsLocked, showAdd){
+  const gkRows = f.rows.filter(r=>r.isGK);
+  const fieldRows = f.rows.filter(r=>!r.isGK);
+
+  function rowHtml(r, num, icon){
+    const deb = rowDebido(r, f);
+    const dio = r.dio||0;
+    const saldo = dio - deb.total;
+    let trClass = r.isGK ? 'row-gk' : '';
+    const complete = r.arrived && !r.isGK && saldo===0;
+    const needsAction = r.arrived && !r.isGK && saldo<0;
+    if(complete) trClass += ' row-complete';
+    else if(needsAction) trClass += ' row-action';
+    else if(r.arrived) trClass += ' row-arrived';
+
+    let saldoHtml;
+    if(!r.arrived || r.isGK) saldoHtml = `<span class="vta-val pend">—</span>`;
+    else if(dio===0) saldoHtml = `<span class="vta-val pend">·</span>`;
+    else if(saldo===0) saldoHtml = `<span class="vta-val exacto">✓ ok</span>`;
+    else if(saldo<0) saldoHtml = `<span class="vta-val falta">-${fmtK(-saldo)}</span>`;
+    else saldoHtml = `<span class="vta-val devolver confirmed">+${fmtK(saldo)}</span>`;
+
+    return `<tr class="${trClass}" id="camprow-${r.rowId}">
+      <td class="col-num sticky-col"><span class="rownum">${num}.</span></td>
+      <td class="col-name sticky-col"><span class="rname">${icon} ${escapeHtml(r.name)}</span></td>
+      <td class="col-ll"><button class="cell-btn ${r.arrived?'ll-on':''}" data-toggle-camp-arrived="${r.rowId}" ${cellsLocked?'disabled':''}>${r.arrived?'✓':''}</button></td>
+      <td class="col-arb"><span class="pago-val">${r.isGK?'—':(r.arrived?fmtK(deb.arbitraje):'—')}</span></td>
+      <td class="col-insc"><span class="pago-val">${r.isGK?'—':(r.arrived?fmtK(deb.inscripcion):'—')}</span></td>
+      <td class="col-total"><span class="pago-val" style="color:var(--gold); font-weight:700;">${r.isGK?'—':(r.arrived?fmtK(deb.total):'—')}</span></td>
+      <td class="col-dio"><input type="number" min="0" step="0.5" class="dio-input" data-camp-dio="${r.rowId}" value="${r.dio?fmtMiles(r.dio):''}" placeholder="0" ${cellsLocked||!r.arrived||r.isGK?'disabled':''}></td>
+      <td class="col-vta" id="saldo-${r.rowId}">${saldoHtml}</td>
+      <td class="col-md"><button class="cell-btn ${r.modo==='E'?'md-e':r.modo==='N'?'md-n':''}" data-cycle-camp-modo="${r.rowId}" ${cellsLocked||!r.arrived||r.isGK?'disabled':''}>${r.modo||'—'}</button></td>
+    </tr>`;
+  }
+
+  let html = `<div class="sheet-wrap"><div class="sheet-scroll"><table class="sheet">
+    <thead><tr>
+      <th class="col-num sticky-col">#</th>
+      <th class="col-name th-name sticky-col">Nombre</th>
+      <th class="col-ll">Ll</th>
+      <th class="col-arb">Arb</th>
+      <th class="col-insc">Insc</th>
+      <th class="col-total">Total</th>
+      <th class="col-dio">Dio</th>
+      <th class="col-vta">Saldo</th>
+      <th class="col-md">Md</th>
+    </tr></thead>
+    <tbody>`;
+
+  if(gkRows.length>0) gkRows.forEach((r,i)=> html += rowHtml(r, i+1, '🥅'));
+  if(fieldRows.length>0) fieldRows.forEach((r,i)=> html += rowHtml(r, i+1, '⚽🏃🏻'));
+  if(f.rows.length===0){
+    html += `<tr><td colspan="9" style="padding:18px; color:var(--chalk-dim); text-align:center;">Agrega jugadores abajo o desde "Plantel"</td></tr>`;
+  }
+
+  html += `</tbody></table></div>`;
+  if(showAdd){
+    html += `<div class="add-strip">
+      <button class="btn btn-outline btn-xs" id="campPickFromRosterBtn">👥 Desde plantel</button>
+      <input type="text" id="campQuickAddInput" placeholder="Jugador nuevo...">
+      <label class="gk-check"><input type="checkbox" id="campQuickAddGK"> Arq.</label>
+      <button class="btn btn-gold btn-xs" id="campQuickAddBtn">+</button>
+    </div>`;
+  }
+  html += `</div>`;
+
+  return html;
+}
+
+function renderCampFinanzas(){
+  const cfg = campConfig();
+  if(!cfg) return renderCampConfigSetup();
+  const t = campTotals();
+
+  let html = `<div class="eyebrow" style="margin-bottom:8px;">Finanzas del campeonato · solo inscripción</div>`;
+  html += `<div class="stats-strip">
+    <div class="stat-chip"><div class="slabel">Inscripción total</div><div class="sval">$${fmt(t.inscripcionTotal)}</div></div>
+    <div class="stat-chip win"><div class="slabel">Recaudado</div><div class="sval">$${fmt(t.inscripcionRecaudadaTotal)}</div></div>
+    <div class="stat-chip ${t.inscripcionPendienteTotal>0?'warn':''}"><div class="slabel">Pendiente</div><div class="sval">$${fmt(t.inscripcionPendienteTotal)}</div></div>
+    <div class="stat-chip"><div class="slabel">Fechas jugadas</div><div class="sval">${t.fechasJugadas}</div></div>
+    <div class="stat-chip"><div class="slabel">Fechas restantes</div><div class="sval">${t.fechasRestantes}</div></div>
+    <div class="stat-chip gold"><div class="slabel">Excedente redondeo</div><div class="sval">$${fmt(t.excedente)}</div></div>
+  </div>`;
+
+
+  html += `<div class="eyebrow" style="margin:12px 0 6px;">Por jugador · inscripción: cuánto le toca, cuánto ha dado y cuánto le falta</div>`;
+  html += `<div class="sheet-wrap"><div class="sheet-scroll" style="max-height:none;"><table class="sheet">
+    <thead><tr>
+      <th class="col-name th-name sticky-col">Jugador</th>
+      <th>Le toca</th>
+      <th>Ha dado</th>
+      <th>Le falta</th>
+    </tr></thead>
+    <tbody>`;
+  const sortedPlayers = t.players.slice().sort((a,b)=>{
+    if(!!a.isGK !== !!b.isGK) return a.isGK ? 1 : -1;
+    return b.debeInsc - a.debeInsc;
+  });
+  sortedPlayers.forEach(p=>{
+    const falta = p.debeInsc; // positivo = debe, negativo = a favor
+    const faltaColor = falta>0 ? 'var(--lose)' : falta<0 ? 'var(--win)' : 'var(--chalk-dim)';
+    const faltaTxt = falta>0 ? '-$'+fmt(falta) : falta<0 ? '+$'+fmt(-falta) : '$0';
+    const sinFechas = p.fechasJugadas===0;
+    html += `<tr class="${p.isGK?'row-gk':''}">
+      <td class="col-name sticky-col"><span class="rname">${p.isGK?'🥅 ':'⚽ '}${escapeHtml(p.name)}${sinFechas && !p.isGK?' <span style="color:var(--chalk-dim);font-weight:400;font-size:9px;">(no ha pagado)</span>':''}</span></td>
+      <td style="text-align:center; font-family:'JetBrains Mono'; font-size:9.5px;">$${fmt(p.leToca)}</td>
+      <td style="text-align:center; font-family:'JetBrains Mono'; font-size:9.5px; color:var(--gold); font-weight:700;">$${fmt(p.insc)}</td>
+      <td style="text-align:center; font-family:'JetBrains Mono'; font-size:9.5px; color:${faltaColor}; font-weight:700;">${faltaTxt}</td>
+    </tr>`;
+  });
+  if(t.players.length===0){
+    html += `<tr><td colspan="4" style="padding:18px; color:var(--chalk-dim); text-align:center;">Agrega jugadores al plantel del campeonato</td></tr>`;
+  }
+  html += `</tbody></table></div></div>`;
+
+  return html;
+}
+
+function renderCampHistorialTab(){
+  const cfg = campConfig();
+  if(!cfg) return renderCampConfigSetup();
+  const finished = campFechas().filter(f=>f.phase==='finalizado').slice().reverse();
+  if(finished.length===0){
+    return `<div class="empty"><span class="ico">📋</span><p>Todavía no hay fechas finalizadas del campeonato.</p></div>`;
+  }
+  let html = `<div class="eyebrow" style="margin-bottom:8px;">Historial del campeonato · ${finished.length} fecha${finished.length>1?'s':''}</div>`;
+  finished.forEach(f=>{
+    const d = fmtDateShort(f.date);
+    const arrived = f.rows.filter(r=>r.arrived);
+    const recaudado = arrived.reduce((s,r)=> s + (r.dio||0), 0);
+    const vsTxt = f.rival ? ` · ${campMarcadorLine(f)}` : '';
+    html += `<div class="hist-item" data-view-camp-fecha="${f.id}">
+      <div class="hist-date">${d.num}<span class="dow">${d.mon}</span></div>
+      <div class="hist-info">
+        <div class="hmain">Fecha ${fechaIndex(f)+1}${vsTxt}</div>
+        <div class="hsub">Recaudado $${fmt(recaudado)}</div>
+      </div>
+      <div class="stat-chip" style="min-width:auto;">${d.dow}</div>
+      <button class="btn btn-xs btn-danger" data-delete-camp-fecha="${f.id}" title="Eliminar">🗑</button>
+    </div>`;
+  });
+  return html;
+}
+
+function renderCampEstadisticaTab(){
+  const cfg = campConfig();
+  if(!cfg) return renderCampConfigSetup();
+  const ms = campMatchStats();
+  const equipo = campEquipoNombre();
+  // orden cronológico (Fecha 1 primero), como una tabla de posiciones normal
+  const matches = campFechas().filter(f=>f.phase==='finalizado' && f.resultado).slice()
+    .sort((a,b)=> fechaIndex(a)-fechaIndex(b));
+
+  let html = `<div class="eyebrow" style="margin-bottom:8px;">${escapeHtml(equipo)} · estadísticas</div>`;
+  html += `<div class="stats-strip">
+    <div class="stat-chip"><div class="slabel">Jugados</div><div class="sval">${ms.jugados}</div></div>
+    <div class="stat-chip win"><div class="slabel">Ganados</div><div class="sval">${ms.g}</div></div>
+    <div class="stat-chip"><div class="slabel">Empatados</div><div class="sval">${ms.e}</div></div>
+    <div class="stat-chip ${ms.p>0?'warn':''}"><div class="slabel">Perdidos</div><div class="sval">${ms.p}</div></div>
+    <div class="stat-chip gold"><div class="slabel">Puntos</div><div class="sval">${ms.puntos}</div></div>
+  </div>`;
+
+  if(matches.length>0){
+    const forma = matches.slice(-5); // últimos 5, orden cronológico
+    html += `<div class="eyebrow" style="margin:12px 0 6px;">Racha reciente</div>
+    <div style="display:flex; gap:6px; margin-bottom:4px;">`;
+    forma.forEach(f=>{
+      const map = { G:{t:'G',c:'var(--win)'}, P:{t:'P',c:'var(--lose)'}, E:{t:'E',c:'var(--gold)'} };
+      const info = map[f.resultado] || {t:'?',c:'var(--chalk-dim)'};
+      html += `<div style="width:26px; height:26px; border-radius:50%; background:${info.c}; color:#0a0f0a; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:12px;">${info.t}</div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div class="eyebrow" style="margin:14px 0 6px;">Tabla de resultados</div>`;
+  html += `<div class="sheet-wrap"><div class="sheet-scroll" style="max-height:none;"><table class="sheet">
+    <thead><tr>
+      <th class="col-name th-name sticky-col">Rival</th>
+      <th>GF</th>
+      <th>GC</th>
+      <th>DG</th>
+      <th>Pts</th>
+    </tr></thead>
+    <tbody>`;
+  if(matches.length===0){
+    html += `<tr><td colspan="5" style="padding:18px; color:var(--chalk-dim); text-align:center;">Todavía no hay resultados registrados. Anota el rival y el marcador desde el botón 📅 de cada fecha.</td></tr>`;
+  } else {
+    matches.forEach(f=>{
+      const gf = f.golesFavor||0, gc = f.golesContra||0, dg = gf-gc;
+      const map = { G:'var(--win)', P:'var(--lose)', E:'var(--gold)' };
+      const color = map[f.resultado] || 'var(--chalk-dim)';
+      const pts = f.resultado==='G' ? 2 : f.resultado==='E' ? 1 : 0;
+      const dgTxt = dg>0 ? `+${dg}` : `${dg}`;
+      html += `<tr>
+        <td class="col-name sticky-col"><span class="rname">${escapeHtml(f.rival||('Fecha '+(fechaIndex(f)+1)))}</span></td>
+        <td style="text-align:center; font-family:'JetBrains Mono'; font-size:10px; font-weight:700;">${gf}</td>
+        <td style="text-align:center; font-family:'JetBrains Mono'; font-size:10px;">${gc}</td>
+        <td style="text-align:center; font-family:'JetBrains Mono'; font-size:10px; color:${color}; font-weight:700;">${dgTxt}</td>
+        <td style="text-align:center; font-family:'JetBrains Mono'; font-size:10px; color:var(--gold); font-weight:700;">${pts}</td>
+      </tr>`;
+    });
+    const dgTotal = ms.gf - ms.gc;
+    const dgTotalTxt = dgTotal>0 ? `+${dgTotal}` : `${dgTotal}`;
+    html += `<tr style="background:rgba(255,201,77,0.08); border-top:2px solid var(--gold);">
+      <td class="col-name sticky-col" style="background:rgba(255,201,77,0.08);"><span class="rname" style="color:var(--gold); text-transform:uppercase; font-size:10.5px;">Total</span></td>
+      <td style="text-align:center; font-family:'JetBrains Mono'; font-size:10.5px; font-weight:900; color:var(--gold);">${ms.gf}</td>
+      <td style="text-align:center; font-family:'JetBrains Mono'; font-size:10.5px; font-weight:900; color:var(--gold);">${ms.gc}</td>
+      <td style="text-align:center; font-family:'JetBrains Mono'; font-size:10.5px; font-weight:900; color:var(--gold);">${dgTotalTxt}</td>
+      <td style="text-align:center; font-family:'JetBrains Mono'; font-size:10.5px; font-weight:900; color:var(--gold);">${ms.puntos}</td>
+    </tr>`;
+  }
+  html += `</tbody></table></div></div>`;
+
+  return html;
+}
+
+/* ================= CAMPEONATO: MODALES ================= */
+function campConfigModalHtml(){
+  const cfg = campConfig() || { arbitraje:40000, inscripcionTotal:500000, numFechas:6, redondeo:500, nombreEquipo:'Banda del Rey' };
+  return `<div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>⚙️ Configuración del campeonato</h3>
+    <p style="margin-bottom:4px;">Nombre del equipo</p>
+    <input type="text" id="cfgNombreEquipo" value="${escapeAttr(cfg.nombreEquipo||'Banda del Rey')}" placeholder="Banda del Rey" style="width:100%; margin-bottom:12px;">
+    <p>Estos valores calculan cuánto paga cada jugador de campo por fecha. El arquero no paga arbitraje ni inscripción.</p>
+    <p style="margin-bottom:4px;">Arbitraje por partido</p>
+    <input type="number" id="cfgArbitraje" value="${cfg.arbitraje}" style="width:100%; margin-bottom:12px;" min="0" step="1000">
+    <p style="margin-bottom:4px;">Inscripción total del equipo</p>
+    <input type="number" id="cfgInscripcion" value="${cfg.inscripcionTotal}" style="width:100%; margin-bottom:12px;" min="0" step="1000">
+    <p style="margin-bottom:4px;">Número de fechas para completar la inscripción</p>
+    <input type="number" id="cfgNumFechas" value="${cfg.numFechas}" style="width:100%; margin-bottom:12px;" min="1" step="1">
+    <p style="margin-bottom:4px;">Redondear el valor por jugador a múltiplos de</p>
+    <select id="cfgRedondeo" style="width:100%; margin-bottom:4px; background:var(--surface-2); color:var(--chalk); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-family:'Inter'; font-size:13px;">
+      <option value="500" ${cfg.redondeo===500?'selected':''}>$500</option>
+      <option value="1000" ${cfg.redondeo===1000?'selected':''}>$1.000</option>
+    </select>
+    <p style="font-size:11px; color:var(--chalk-dim); margin:4px 0 0;">El excedente por redondeo se guarda automáticamente y se descuenta del saldo pendiente de la inscripción.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-block" id="cancelCampConfigBtn">Cancelar</button>
+      <button class="btn btn-gold btn-block" id="saveCampConfigBtn">Guardar</button>
+    </div>
+  </div></div>`;
+}
+function wireCampConfigModal(){
+  const q = sel => document.querySelector(sel);
+  q('#cancelCampConfigBtn').onclick = closeModal;
+  q('#saveCampConfigBtn').onclick = ()=>{
+    const nombreEquipo = (q('#cfgNombreEquipo').value||'').trim() || 'Banda del Rey';
+    const arbitraje = Math.max(0, Math.round(parseFloat(q('#cfgArbitraje').value)||0));
+    const inscripcionTotal = Math.max(0, Math.round(parseFloat(q('#cfgInscripcion').value)||0));
+    const numFechas = Math.max(1, Math.round(parseFloat(q('#cfgNumFechas').value)||1));
+    const redondeo = parseInt(q('#cfgRedondeo').value,10)===1000 ? 1000 : 500;
+    const c = activeCampeonato();
+    if(c) c.config = { arbitraje, inscripcionTotal, numFechas, redondeo, nombreEquipo };
+    saveData(); closeModal(); render();
+    showToast('Campeonato configurado ✓');
+  };
+}
+
+function campPlayerPickerModal(f){
+  const inFecha = new Set(f.rows.map(r=>r.playerId));
+  let html = `<div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>Convocar desde plantel</h3>
+    <p>Toca para agregar o quitar de la fecha de hoy.</p>
+    <input type="text" id="campPickerSearch" placeholder="Buscar..." style="width:100%; margin-bottom:10px;">
+    <div id="campPickerList">`;
+  const gk = roster().filter(p=>p.isGK);
+  const field = roster().filter(p=>!p.isGK);
+  function prow(p){
+    const sel = inFecha.has(p.id);
+    return `<div class="roster-row" data-camp-pick-name="${escapeAttr(p.name.toLowerCase())}" data-camp-pick="${p.id}" style="cursor:pointer;">
+      <span style="width:22px;height:22px;border-radius:6px;border:2px solid ${sel?'var(--win)':'var(--chalk-dim)'};background:${sel?'var(--win)':'none'};color:#0a1f10;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex-shrink:0;">${sel?'✓':''}</span>
+      <span style="flex:1;font-weight:600;font-size:13.5px;">${p.isGK?'🥅 ':''}${escapeHtml(p.name)}</span>
+    </div>`;
+  }
+  if(gk.length) html += gk.map(prow).join('');
+  if(field.length) html += field.map(prow).join('');
+  if(roster().length===0) html += `<p>Tu plantel del campeonato está vacío. Agrega jugadores desde "✎ Plantel".</p>`;
+  html += `</div>
+    <div class="modal-actions">
+      <button class="btn btn-gold btn-block" id="closeCampPickerBtn">Listo</button>
+    </div>
+  </div></div>`;
+  return html;
+}
+function wireCampPickerModal(f){
+  const q = sel => document.querySelector(sel);
+  const qa = sel => document.querySelectorAll(sel);
+
+  qa('[data-camp-pick]').forEach(el=>{
+    el.onclick = ()=>{
+      const id = el.dataset.campPick;
+      const idx = f.rows.findIndex(r=>r.playerId===id);
+      if(idx>=0){
+        f.rows.splice(idx,1);
+      } else {
+        const rp = roster().find(p=>p.id===id);
+        if(!rp) return;
+        if(!canAddToWeek(f, rp.isGK)){
+          showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en la fecha` : `Máximo ${MAX_FIELD} jugadores en la fecha`);
+          return;
+        }
+        f.rows.push(makeCampRow(rp));
+      }
+      saveData();
+      const nowSel = f.rows.some(r=>r.playerId===id);
+      const badge = el.querySelector('span');
+      badge.style.borderColor = nowSel ? 'var(--win)' : 'var(--chalk-dim)';
+      badge.style.background = nowSel ? 'var(--win)' : 'none';
+      badge.textContent = nowSel ? '✓' : '';
+    };
+  });
+  const search = q('#campPickerSearch');
+  if(search) search.oninput = ()=>{
+    const v = search.value.toLowerCase();
+    qa('[data-camp-pick-name]').forEach(el=>{ el.style.display = el.dataset.campPickName.includes(v) ? 'flex' : 'none'; });
+  };
+  const closeBtn = q('#closeCampPickerBtn');
+  if(closeBtn) closeBtn.onclick = ()=>{ closeModal(); render(); };
+}
+
+function campRosterEditorModal(){
+  const f = getCurrentFecha();
+  const convocados = f ? f.rows.map(r=>roster().find(p=>p.id===r.playerId)).filter(p=>p && p.phone) : [];
+  let html = `<div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>Plantel · Campeonato</h3>
+    <p>${f ? 'Toca "+ Hoy" para convocar a alguien a la fecha activa.' : 'Crea una fecha en la pestaña Fechas para poder convocar desde aquí.'}</p>
+    <div id="campBulkReminderBox" style="margin-bottom:10px;">
+      ${f ? (convocados.length>0
+        ? `<button class="btn btn-wsp btn-block" id="campBulkWspBtn">📢 Recordar a todos los convocados (${convocados.length})</button>`
+        : `<p style="font-size:11px;color:var(--chalk-dim);">Agrega números de WhatsApp a los convocados de hoy para poder recordarles a todos de una.</p>`)
+      : ''}
+    </div>
+    <div id="campRosterList">`;
+  roster().forEach(p=>{
+    const inFecha = f && f.rows.some(r=>r.playerId===p.id);
+    html += `<div class="roster-row">
+      <input type="text" data-camp-roster-name="${p.id}" value="${escapeAttr(p.name)}">
+      <button class="btn btn-xs ${p.isGK?'btn-gold':'btn-outline'}" data-camp-roster-gk="${p.id}">${p.isGK?'🥅':'Arq.'}</button>
+      ${f ? `<button class="btn btn-xs ${inFecha?'btn-gold':'btn-outline'}" data-camp-roster-convene="${p.id}">${inFecha?'✓ Hoy':'+ Hoy'}</button>` : ''}
+      ${p.phone
+        ? `<button class="btn btn-icon btn-wsp" data-camp-roster-wsp="${p.id}" title="Enviar WhatsApp">💬</button>
+           <button class="btn btn-icon btn-outline" data-camp-roster-phone-edit="${p.id}" title="Editar número">✎</button>`
+        : `<button class="btn btn-icon btn-outline" data-camp-roster-phone-edit="${p.id}" title="Agregar número de WhatsApp">📞+</button>`
+      }
+      <button class="btn btn-xs btn-danger" data-camp-roster-remove="${p.id}">✕</button>
+    </div>`;
+  });
+  html += `</div>
+    <div class="add-strip" style="border:none; padding:10px 0 0; background:none;">
+      <input type="text" id="campRosterAddInput" placeholder="Nuevo jugador...">
+      <label class="gk-check"><input type="checkbox" id="campRosterAddGK"> Arq.</label>
+      <button class="btn btn-gold btn-xs" id="campRosterAddBtn">+</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-gold btn-block" id="closeCampRosterBtn">Listo</button>
+    </div>
+  </div></div>`;
+  return html;
+}
+
+function openCampPhoneEditModal(p){
+  const box = document.createElement('div');
+  box.id = 'campPhoneEditBg';
+  box.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;';
+  box.innerHTML = `<div style="background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px; width:100%; max-width:340px;">
+    <h3 style="margin:0 0 4px;">WhatsApp de ${escapeHtml(p.name)}</h3>
+    <p style="margin:0 0 10px; font-size:11.5px; color:var(--chalk-dim);">Con indicativo de país, sin + ni espacios. Ej: 573001234567</p>
+    <input type="tel" id="campPhoneEditInput" value="${escapeAttr(p.phone||'')}" placeholder="573001234567" style="width:100%; padding:8px 9px; font-size:13px; margin-bottom:12px;">
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-outline" id="campPhoneEditCancel" style="flex:1;">Cancelar</button>
+      <button class="btn btn-gold" id="campPhoneEditSave" style="flex:1;">Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(box);
+  const input = box.querySelector('#campPhoneEditInput');
+  input.focus();
+  box.querySelector('#campPhoneEditCancel').onclick = ()=> box.remove();
+  box.addEventListener('click', (e)=>{ if(e.target.id==='campPhoneEditBg') box.remove(); });
+  box.querySelector('#campPhoneEditSave').onclick = ()=>{
+    p.phone = (input.value||'').replace(/[^0-9]/g,'');
+    saveData();
+    box.remove();
+    closeModal();
+    openModal(campRosterEditorModal());
+    wireCampRosterModal();
+  };
+}
+
+function wireCampRosterModal(){
+  const q = sel => document.querySelector(sel);
+  const qa = sel => document.querySelectorAll(sel);
+
+  qa('[data-camp-roster-name]').forEach(inp=>{
+    inp.onchange = ()=>{
+      const p = roster().find(x=>x.id===inp.dataset.campRosterName);
+      p.name = inp.value.trim() || p.name;
+      const f = getCurrentFecha();
+      if(f){ f.rows.filter(r=>r.playerId===p.id).forEach(r=> r.name = p.name); }
+      saveData();
+    };
+  });
+  qa('[data-camp-roster-gk]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const p = roster().find(x=>x.id===btn.dataset.campRosterGk);
+      p.isGK = !p.isGK;
+      saveData();
+      btn.className = 'btn btn-xs ' + (p.isGK?'btn-gold':'btn-outline');
+      btn.textContent = p.isGK ? '🥅' : 'Arq.';
+    };
+  });
+  qa('[data-camp-roster-remove]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const pid = btn.dataset.campRosterRemove;
+      const c = activeCampeonato();
+      if(c) c.roster = roster().filter(x=>x.id!==pid);
+      const f = getCurrentFecha();
+      if(f) f.rows = f.rows.filter(r=>r.playerId!==pid);
+      saveData();
+      btn.closest('.roster-row').remove();
+    };
+  });
+  qa('[data-camp-roster-convene]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const f = getCurrentFecha();
+      if(!f) return;
+      const pid = btn.dataset.campRosterConvene;
+      const idx = f.rows.findIndex(r=>r.playerId===pid);
+      if(idx>=0){
+        f.rows.splice(idx,1);
+      } else {
+        const rp = roster().find(p=>p.id===pid);
+        if(!rp) return;
+        if(!canAddToWeek(f, rp.isGK)){
+          showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en la fecha` : `Máximo ${MAX_FIELD} jugadores en la fecha`);
+          return;
+        }
+        f.rows.push(makeCampRow(rp));
+      }
+      saveData();
+      const nowIn = f.rows.some(r=>r.playerId===pid);
+      btn.className = 'btn btn-xs ' + (nowIn?'btn-gold':'btn-outline');
+      btn.textContent = nowIn ? '✓ Hoy' : '+ Hoy';
+    };
+  });
+  qa('[data-camp-roster-phone-edit]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const p = roster().find(x=>x.id===btn.dataset.campRosterPhoneEdit);
+      if(!p) return;
+      openCampPhoneEditModal(p);
+    };
+  });
+  qa('[data-camp-roster-wsp]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const p = roster().find(x=>x.id===btn.dataset.campRosterWsp);
+      sendWsp(p);
+    };
+  });
+
+  let bulkQueue = [];
+  let bulkIndex = 0;
+  function renderBulkStep(){
+    const box = q('#campBulkReminderBox');
+    if(!box) return;
+    if(bulkIndex >= bulkQueue.length){
+      box.innerHTML = `<p style="font-size:11px;color:var(--win);text-align:center;">✅ Recordatorio enviado a los ${bulkQueue.length} convocados.</p>`;
+      return;
+    }
+    const p = bulkQueue[bulkIndex];
+    box.innerHTML = `<div style="display:flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:7px 8px;">
+      <span style="flex:1; font-size:11px;">👉 Siguiente: <b>${escapeHtml(p.name)}</b> (${bulkIndex+1}/${bulkQueue.length})</span>
+      <button class="btn btn-wsp btn-xs" id="campBulkSendStepBtn">💬 Enviar</button>
+      <button class="btn btn-xs btn-outline" id="campBulkCancelBtn">✕</button>
+    </div>`;
+    q('#campBulkSendStepBtn').onclick = ()=>{ sendWsp(p); bulkIndex++; renderBulkStep(); };
+    q('#campBulkCancelBtn').onclick = ()=>{ box.innerHTML = ''; };
+  }
+  const bulkBtn = q('#campBulkWspBtn');
+  if(bulkBtn){
+    bulkBtn.onclick = ()=>{
+      const f = getCurrentFecha();
+      if(!f) return;
+      bulkQueue = f.rows.map(r=>roster().find(p=>p.id===r.playerId)).filter(p=>p && p.phone);
+      bulkIndex = 0;
+      renderBulkStep();
+    };
+  }
+
+  const addBtn = q('#campRosterAddBtn');
+  function addRoster(){
+    const inp = q('#campRosterAddInput');
+    const name = (inp.value||'').trim();
+    if(!name) return;
+    const isGK = q('#campRosterAddGK').checked;
+    roster().push({id:uid(), name, isGK});
+    saveData();
+    closeModal();
+    openModal(campRosterEditorModal());
+    wireCampRosterModal();
+  }
+  if(addBtn) addBtn.onclick = addRoster;
+  const addInput = q('#campRosterAddInput');
+  if(addInput) addInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addRoster(); } });
+
+  const closeBtn = q('#closeCampRosterBtn');
+  if(closeBtn) closeBtn.onclick = ()=>{ closeModal(); render(); };
+}
+
+/* ================= CAMPEONATO: EVENTOS ================= */
+function updateCampLive(f){
+  const arrived = f.rows.filter(r=>r.arrived);
+  let recaudado=0, efectivo=0, nequi=0;
+  arrived.forEach(r=>{
+    const deb = rowDebido(r,f);
+    const pagado = Math.min(r.dio||0, deb.total);
+    recaudado += pagado;
+    if(r.modo==='E') efectivo += pagado;
+    if(r.modo==='N') nequi += pagado;
+  });
+  const elR = document.getElementById('campStatRecaudado');
+  const elE = document.getElementById('campStatEfectivo');
+  const elN = document.getElementById('campStatNequi');
+  if(elR) elR.textContent = '$'+fmt(recaudado);
+  if(elE) elE.textContent = '$'+fmt(efectivo);
+  if(elN) elN.textContent = '$'+fmt(nequi);
+
+  f.rows.forEach(r=>{
+    const cell = document.getElementById('saldo-'+r.rowId);
+    if(!cell) return;
+    const deb = rowDebido(r,f);
+    const dio = r.dio||0;
+    const saldo = dio - deb.total;
+    let html;
+    if(!r.arrived || r.isGK) html = `<span class="vta-val pend">—</span>`;
+    else if(dio===0) html = `<span class="vta-val pend">·</span>`;
+    else if(saldo===0) html = `<span class="vta-val exacto">✓ ok</span>`;
+    else if(saldo<0) html = `<span class="vta-val falta">-${fmtK(-saldo)}</span>`;
+    else html = `<span class="vta-val devolver confirmed">+${fmtK(saldo)}</span>`;
+    cell.innerHTML = html;
+
+    const tr = document.getElementById('camprow-'+r.rowId);
+    if(tr){
+      let cls = r.isGK ? 'row-gk' : '';
+      const complete = r.arrived && !r.isGK && saldo===0;
+      const needsAction = r.arrived && !r.isGK && saldo<0;
+      if(complete) cls += ' row-complete';
+      else if(needsAction) cls += ' row-action';
+      else if(r.arrived) cls += ' row-arrived';
+      tr.className = cls;
+    }
+  });
+}
+
+function wireCampeonatoEvents(){
+  const q = sel => document.querySelector(sel);
+  const qa = sel => document.querySelectorAll(sel);
+
+  const openCampConfigBtn = q('#openCampConfigBtn');
+  if(openCampConfigBtn) openCampConfigBtn.onclick = ()=>{ openModal(campConfigModalHtml()); wireCampConfigModal(); };
+  const editCampConfigBtn = q('#editCampConfigBtn');
+  if(editCampConfigBtn) editCampConfigBtn.onclick = ()=>{ openModal(campConfigModalHtml()); wireCampConfigModal(); };
+  const editCampConfigTopBtn = q('#editCampConfigTopBtn');
+  if(editCampConfigTopBtn) editCampConfigTopBtn.onclick = ()=>{ openModal(campConfigModalHtml()); wireCampConfigModal(); };
+
+  const newFechaBtn = q('#newFechaBtn');
+  if(newFechaBtn) newFechaBtn.onclick = newFecha;
+
+  const changeFechaBtn = q('#changeFechaBtn');
+  if(changeFechaBtn) changeFechaBtn.onclick = ()=>{
+    const f = activeFecha();
+    const info = modeInfo();
+    const equipo = campEquipoNombre();
+    openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
+      <h3>${info.dateLabel}</h3>
+      <p style="margin-bottom:6px;">Fecha</p>
+      <input type="date" id="campDateInput" value="${f.date}" style="width:100%; margin-bottom:12px;">
+      <p style="margin-bottom:6px;">Hora</p>
+      <input type="time" id="campHoraInput" value="${f.hora||info.defaultHora}" style="width:100%; margin-bottom:12px;">
+      <p style="margin-bottom:6px;">Lugar</p>
+      <input type="text" id="campLugarInput" value="${escapeAttr(f.lugar||info.defaultLugar)}" placeholder="${info.defaultLugar}" style="width:100%; margin-bottom:12px;">
+      <p style="margin-bottom:6px;">Rival (${escapeHtml(equipo)} juega de local)</p>
+      <input type="text" id="campRivalInput" value="${escapeAttr(f.rival||'')}" placeholder="Nombre del equipo rival" style="width:100%; margin-bottom:12px;">
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer;">
+        <input type="checkbox" id="campTieneResultadoInput" ${f.resultado?'checked':''} style="width:16px; height:16px;">
+        <span style="font-size:12.5px;">Ya se jugó / registrar el marcador</span>
+      </label>
+      <div class="row" style="gap:10px;" id="campGolesRow">
+        <div style="flex:1;">
+          <p style="margin-bottom:6px;">Goles de ${escapeHtml(equipo)}</p>
+          <input type="number" min="0" id="campGolesFavorInput" value="${f.golesFavor||0}" style="width:100%;">
+        </div>
+        <div style="flex:1;">
+          <p style="margin-bottom:6px;">Goles del rival</p>
+          <input type="number" min="0" id="campGolesContraInput" value="${f.golesContra||0}" style="width:100%;">
+        </div>
+      </div>
+      <p id="campResultadoPreview" style="font-size:12px; margin-top:8px; font-weight:700;"></p>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-block" id="cancelCampDateBtn">Cancelar</button>
+        <button class="btn btn-gold btn-block" id="saveCampDateBtn">Guardar</button>
+      </div>
+    </div></div>`);
+    q('#cancelCampDateBtn').onclick = closeModal;
+
+    function updatePreview(){
+      const tiene = q('#campTieneResultadoInput').checked;
+      const prev = q('#campResultadoPreview');
+      const rowEl = q('#campGolesRow');
+      rowEl.style.opacity = tiene ? '1' : '0.4';
+      q('#campGolesFavorInput').disabled = !tiene;
+      q('#campGolesContraInput').disabled = !tiene;
+      if(!tiene){ prev.textContent = ''; return; }
+      const gf = Math.max(0, Math.round(parseFloat(q('#campGolesFavorInput').value)||0));
+      const gc = Math.max(0, Math.round(parseFloat(q('#campGolesContraInput').value)||0));
+      let txt, color;
+      if(gf>gc){ txt='Ganó ✓'; color='var(--win)'; }
+      else if(gf<gc){ txt='Perdió'; color='var(--lose)'; }
+      else { txt='Empató'; color='var(--gold)'; }
+      prev.style.color = color;
+      prev.textContent = `${equipo} ${gf} - ${gc} → ${txt}`;
+    }
+    q('#campTieneResultadoInput').addEventListener('change', updatePreview);
+    q('#campGolesFavorInput').addEventListener('input', updatePreview);
+    q('#campGolesContraInput').addEventListener('input', updatePreview);
+    updatePreview();
+
+    q('#saveCampDateBtn').onclick = ()=>{
+      f.date = q('#campDateInput').value || f.date;
+      f.hora = q('#campHoraInput').value || f.hora;
+      f.lugar = (q('#campLugarInput').value||'').trim() || f.lugar;
+      f.rival = (q('#campRivalInput').value||'').trim();
+      const tiene = q('#campTieneResultadoInput').checked;
+      if(tiene){
+        const gf = Math.max(0, Math.round(parseFloat(q('#campGolesFavorInput').value)||0));
+        const gc = Math.max(0, Math.round(parseFloat(q('#campGolesContraInput').value)||0));
+        f.golesFavor = gf;
+        f.golesContra = gc;
+        f.resultado = gf>gc ? 'G' : gf<gc ? 'P' : 'E';
+      } else {
+        f.resultado = null;
+        f.golesFavor = 0;
+        f.golesContra = 0;
+      }
+      saveData(); closeModal(); render();
+    };
+  };
+
+  const editCampRosterBtn = q('#editCampRosterBtn');
+  if(editCampRosterBtn) editCampRosterBtn.onclick = ()=>{ openModal(campRosterEditorModal()); wireCampRosterModal(); };
+
+  const campPickFromRosterBtn = q('#campPickFromRosterBtn');
+  if(campPickFromRosterBtn) campPickFromRosterBtn.onclick = ()=>{
+    const f = getCurrentFecha();
+    openModal(campPlayerPickerModal(f));
+    wireCampPickerModal(f);
+  };
+
+  const backBtn = q('#backToCurrentFechaBtn');
+  if(backBtn) backBtn.onclick = ()=>{
+    const hadCurrent = !!getCurrentFecha();
+    historyViewId=null;
+    if(!hadCurrent) campTab='historial';
+    render();
+  };
+
+  const reopenFechaBtn = q('#reopenFechaBtn');
+  if(reopenFechaBtn) reopenFechaBtn.onclick = ()=>{
+    const f = campFechas().find(x=>x.id===historyViewId);
+    if(!f) return;
+    f.phase = 'jugando';
+    historyViewId = null;
+    saveData(); render();
+    showToast('Fecha reabierta ↺');
+  };
+
+  const deleteThisFechaBtn = q('#deleteThisFechaBtn');
+  if(deleteThisFechaBtn) deleteThisFechaBtn.onclick = ()=>{
+    const id = historyViewId;
+    const f = campFechas().find(x=>x.id===id);
+    openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
+      <h3>¿Eliminar esta fecha?</h3>
+      <p>${f ? fmtDateLong(f.date) : ''} — esta acción no se puede deshacer.</p>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-block" id="cancelDeleteFechaBtn">Cancelar</button>
+        <button class="btn btn-danger btn-block" id="confirmDeleteFechaBtn">Eliminar</button>
+      </div>
+    </div></div>`);
+    q('#cancelDeleteFechaBtn').onclick = closeModal;
+    q('#confirmDeleteFechaBtn').onclick = ()=>{
+      setCampFechas(campFechas().filter(x=>x.id!==id));
+      historyViewId = null;
+      saveData(); closeModal(); campTab='historial'; render(); showToast('Fecha eliminada');
+    };
+  };
+
+  qa('[data-view-camp-fecha]').forEach(el=>{ el.onclick = ()=>{ historyViewId = el.dataset.viewCampFecha; campTab='fechas'; render(); }; });
+
+  qa('[data-delete-camp-fecha]').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      const id = btn.dataset.deleteCampFecha;
+      const f = campFechas().find(x=>x.id===id);
+      openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
+        <h3>¿Eliminar esta fecha?</h3>
+        <p>${f ? fmtDateLong(f.date) : ''} — esta acción no se puede deshacer.</p>
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-block" id="cancelDeleteFechaBtn">Cancelar</button>
+          <button class="btn btn-danger btn-block" id="confirmDeleteFechaBtn">Eliminar</button>
+        </div>
+      </div></div>`);
+      q('#cancelDeleteFechaBtn').onclick = closeModal;
+      q('#confirmDeleteFechaBtn').onclick = ()=>{
+        setCampFechas(campFechas().filter(x=>x.id!==id));
+        saveData(); closeModal(); render(); showToast('Fecha eliminada');
+      };
+    };
+  });
+
+  const startFechaBtn = q('#startFechaBtn');
+  if(startFechaBtn) startFechaBtn.onclick = ()=>{
+    const f = getCurrentFecha();
+    f.rows.forEach(r=>{ r.modo = 'E'; });
+    f.phase='jugando'; saveData(); render(); showToast('¡Fecha iniciada! ⚽');
+  };
+
+  const finishFechaBtn = q('#finishFechaBtn');
+  if(finishFechaBtn) finishFechaBtn.onclick = ()=>{
+    const f = getCurrentFecha();
+    const arrivedField = f.rows.filter(r=>r.arrived && !r.isGK);
+    const pendientes = arrivedField.filter(r=> (r.dio||0)===0 || rowSaldo(r,f) < 0).length;
+    if(pendientes>0){
+      openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
+        <h3>¿Finalizar de todas formas?</h3>
+        <p>${pendientes} jugador${pendientes>1?'es':''} todavía ${pendientes>1?'tienen':'tiene'} pagos pendientes.</p>
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-block" id="cancelFinishFechaBtn">Seguir</button>
+          <button class="btn btn-gold btn-block" id="confirmFinishFechaBtn">Finalizar igual</button>
+        </div>
+      </div></div>`);
+      q('#cancelFinishFechaBtn').onclick = closeModal;
+      q('#confirmFinishFechaBtn').onclick = ()=>{ doFinishFecha(f); closeModal(); };
+    } else { doFinishFecha(f); }
+  };
+
+  qa('[data-toggle-camp-arrived]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const f = getCurrentFecha();
+      const r = f.rows.find(x=>x.rowId===btn.dataset.toggleCampArrived);
+      r.arrived = !r.arrived;
+      if(!r.arrived){ r.dio=0; r.modo='E'; }
+      saveData(); render();
+    };
+  });
+  qa('[data-camp-dio]').forEach(inp=>{
+    inp.oninput = ()=>{
+      const f = getCurrentFecha();
+      const r = f.rows.find(x=>x.rowId===inp.dataset.campDio);
+      r.dio = Math.round((parseFloat(inp.value)||0)*1000);
+      updateCampLive(f);
+    };
+    inp.onchange = ()=>{ saveData(); };
+  });
+  qa('[data-cycle-camp-modo]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const f = getCurrentFecha();
+      const r = f.rows.find(x=>x.rowId===btn.dataset.cycleCampModo);
+      r.modo = r.modo==='' ? 'E' : r.modo==='E' ? 'N' : '';
+      saveData(); render();
+    };
+  });
+
+  const campQuickAddBtn = q('#campQuickAddBtn');
+  function campQuickAdd(){
+    const f = getCurrentFecha();
+    const inp = q('#campQuickAddInput');
+    const name = (inp.value||'').trim();
+    if(!name) return;
+    const isGK = q('#campQuickAddGK').checked;
+    if(!canAddToWeek(f, isGK)){
+      showToast(isGK ? `Máximo ${MAX_GK} arqueros en la fecha` : `Máximo ${MAX_FIELD} jugadores en la fecha`);
+      return;
+    }
+    let rp = roster().find(p=>p.name.toLowerCase()===name.toLowerCase());
+    if(!rp){ rp = {id:uid(), name, isGK}; roster().push(rp); }
+    f.rows.push(makeCampRow(rp, {arrived:true}));
+    saveData(); render();
+    setTimeout(()=>{ const i=q('#campQuickAddInput'); if(i) i.focus(); }, 0);
+  }
+  if(campQuickAddBtn) campQuickAddBtn.onclick = campQuickAdd;
+  const campQuickAddInput = q('#campQuickAddInput');
+  if(campQuickAddInput) campQuickAddInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); campQuickAdd(); } });
+}
+
+function doFinishFecha(f){ f.phase='finalizado'; saveData(); render(); showToast('Fecha finalizada ✓'); }
+
+function doFinish(w){ w.phase='finalizado'; saveData(); render(); showToast('Partido finalizado ✓'); }
 
 function openModal(html){
   const div = document.createElement('div');
