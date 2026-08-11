@@ -1580,13 +1580,16 @@ function renderCampFechasTab(){
     let recaudado=0, efectivo=0, nequi=0, recArb=0, recInsc=0;
     arrived.forEach(r=>{
       const deb = rowDebido(r,f);
-      const pagado = Math.min(r.dio||0, deb.total);
-      recaudado += pagado;
-      if(r.modo==='E') efectivo += pagado;
-      if(r.modo==='N') nequi += pagado;
-      // El arbitraje se cobra primero (es del día); el resto de lo pagado va a inscripción
-      const arbPagado = Math.min(pagado, deb.arbitraje);
-      const inscPagado = pagado - arbPagado;
+      // Se cuenta TODO lo que dio el jugador, no solo hasta lo que "debía" ese día:
+      // si da de más, ese excedente es plata real recibida (abono adelantado a inscripción).
+      const dio = r.dio||0;
+      recaudado += dio;
+      if(r.modo==='E') efectivo += dio;
+      if(r.modo==='N') nequi += dio;
+      // El arbitraje se cobra primero (es del día, tope fijo); el resto de lo dado va a inscripción,
+      // incluso si excede la cuota del día (queda como abono a favor).
+      const arbPagado = Math.min(dio, deb.arbitraje);
+      const inscPagado = dio - arbPagado;
       recArb += arbPagado;
       recInsc += inscPagado;
     });
@@ -2129,12 +2132,12 @@ function updateCampLive(f){
   let recaudado=0, efectivo=0, nequi=0, recArb=0, recInsc=0;
   arrived.forEach(r=>{
     const deb = rowDebido(r,f);
-    const pagado = Math.min(r.dio||0, deb.total);
-    recaudado += pagado;
-    if(r.modo==='E') efectivo += pagado;
-    if(r.modo==='N') nequi += pagado;
-    const arbPagado = Math.min(pagado, deb.arbitraje);
-    const inscPagado = pagado - arbPagado;
+    const dio = r.dio||0;
+    recaudado += dio;
+    if(r.modo==='E') efectivo += dio;
+    if(r.modo==='N') nequi += dio;
+    const arbPagado = Math.min(dio, deb.arbitraje);
+    const inscPagado = dio - arbPagado;
     recArb += arbPagado;
     recInsc += inscPagado;
   });
