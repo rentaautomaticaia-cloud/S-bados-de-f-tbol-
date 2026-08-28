@@ -59,6 +59,15 @@
   }
   .mode-switch button.active{ background:rgba(255,201,77,0.14); border-color:var(--gold); color:var(--gold); }
 
+  .back-bar{ display:flex; align-items:center; margin-bottom:8px; min-height:32px; }
+  .back-btn{
+    width:32px; height:32px; border-radius:50%; padding:0; flex:0 0 auto;
+    border:1px solid var(--line); background:var(--surface); color:var(--gold);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .back-btn svg{ width:17px; height:17px; display:block; }
+  .back-btn:active{ transform:scale(0.92); background:var(--surface-2); }
+
   .camp-selector-bar{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
     background:var(--surface); border:1px solid var(--line); border-radius:9px;
@@ -219,6 +228,8 @@
   .modal p{font-size:13px; color:var(--chalk-dim); margin:0 0 12px;}
   .modal-actions{display:flex; gap:8px; margin-top:14px;}
   .roster-row{ display:flex; align-items:center; gap:5px; padding:6px 0; border-bottom:1px solid var(--line); }
+  .picker-group-label{ font-family:'JetBrains Mono'; font-size:9.5px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; color:var(--gold); padding:10px 0 4px; }
+  .picker-group-label:first-child{ padding-top:0; }
   .roster-row input[type=text]{ flex:1; min-width:0; padding:6px 7px; font-size:12.5px; }
   .roster-row .btn-xs{ flex:0 0 auto; padding:5px 7px; font-size:10.5px; white-space:nowrap; }
   .roster-row .btn-icon{ flex:0 0 auto; padding:5px 6px; font-size:11px; min-width:26px; }
@@ -297,6 +308,21 @@ let mode = "sabado";
 let tab = "sabado";
 let campTab = "fechas";
 let historyViewId = null;
+let navStack = [];
+
+// ---- Navegación "Atrás" (mantiene el estado de la app, sin recargar) ----
+function snapshotNav(){ return { mode, tab, campTab, historyViewId }; }
+function pushNav(){
+  navStack.push(snapshotNav());
+  try{ history.pushState({ navDepth: navStack.length }, ''); }catch(e){}
+}
+function goBack(){
+  if(navStack.length===0) return;
+  const prev = navStack.pop();
+  mode = prev.mode; tab = prev.tab; campTab = prev.campTab; historyViewId = prev.historyViewId;
+  render();
+}
+const BACK_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`;
 
 function modeInfo(){ return MODE_INFO[mode]; }
 function data(){ return state.data[mode]; }
@@ -721,6 +747,7 @@ function render(){
       </div>`;
   app.innerHTML = `
     <div class="wrap content" id="content">
+      ${navStack.length>0 ? `<div class="back-bar"><button class="back-btn" id="globalBackBtn" title="Atrás" aria-label="Atrás">${BACK_ICON_SVG}</button></div>` : ''}
       <div class="mode-switch">
         <button data-mode="sabado" class="${mode==='sabado'?'active':''}">${MODE_INFO.sabado.tabIcon} ${MODE_INFO.sabado.tabLabel}</button>
         <button data-mode="semana" class="${mode==='semana'?'active':''}">${MODE_INFO.semana.tabIcon} ${MODE_INFO.semana.tabLabel}</button>
@@ -730,9 +757,11 @@ function render(){
     </div>
     ${tabbarHtml}
   `;
-  document.querySelectorAll('.tabbar [data-tab]').forEach(b=>{ b.onclick = ()=>{ tab=b.dataset.tab; historyViewId=null; render(); }; });
-  document.querySelectorAll('.tabbar [data-camptab]').forEach(b=>{ b.onclick = ()=>{ campTab=b.dataset.camptab; historyViewId=null; render(); }; });
-  document.querySelectorAll('.mode-switch button').forEach(b=>{ b.onclick = ()=>{ if(mode!==b.dataset.mode){ mode=b.dataset.mode; tab='sabado'; campTab='fechas'; historyViewId=null; render(); } }; });
+  const globalBackBtn = document.getElementById('globalBackBtn');
+  if(globalBackBtn) globalBackBtn.onclick = goBack;
+  document.querySelectorAll('.tabbar [data-tab]').forEach(b=>{ b.onclick = ()=>{ if(tab!==b.dataset.tab){ pushNav(); tab=b.dataset.tab; historyViewId=null; render(); } }; });
+  document.querySelectorAll('.tabbar [data-camptab]').forEach(b=>{ b.onclick = ()=>{ if(campTab!==b.dataset.camptab){ pushNav(); campTab=b.dataset.camptab; historyViewId=null; render(); } }; });
+  document.querySelectorAll('.mode-switch button').forEach(b=>{ b.onclick = ()=>{ if(mode!==b.dataset.mode){ pushNav(); mode=b.dataset.mode; tab='sabado'; campTab='fechas'; historyViewId=null; render(); } }; });
   const campSelectorBtn = document.getElementById('campeonatoSelectorBtn');
   if(campSelectorBtn) campSelectorBtn.onclick = ()=>{ openModal(campeonatoSwitcherModalHtml()); wireCampeonatoSwitcherModal(); };
   const content = document.getElementById('modeContent');
@@ -921,30 +950,74 @@ function renderHistorial(){
   return html;
 }
 
-function weekPlayerPickerModal(w){
+function pickerRowHtml(p, sel){
+  return `<div class="roster-row" data-pick-name="${escapeAttr(normalizeSearch(p.name))}" data-pick="${p.id}" style="cursor:pointer;">
+    <span style="width:22px;height:22px;border-radius:6px;border:2px solid ${sel?'var(--win)':'var(--chalk-dim)'};background:${sel?'var(--win)':'none'};color:#0a1f10;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex-shrink:0;">${sel?'✓':''}</span>
+    <span style="flex:1;font-weight:600;font-size:13.5px;">${p.isGK?'🥅 ':''}${escapeHtml(p.name)}</span>
+  </div>`;
+}
+function sortGkFirst(arr){ return [...arr.filter(p=>p.isGK), ...arr.filter(p=>!p.isGK)]; }
+function weekPickerListHtml(w){
   const inWeek = new Set(w.rows.map(r=>r.playerId));
+  const all = roster();
+  const selected = sortGkFirst(all.filter(p=>inWeek.has(p.id)));
+  const unselected = sortGkFirst(all.filter(p=>!inWeek.has(p.id)));
+  let html = '';
+  if(selected.length){
+    html += `<div class="picker-group-label">✓ Convocados (${selected.length})</div>`;
+    html += selected.map(p=>pickerRowHtml(p,true)).join('');
+  }
+  if(unselected.length){
+    if(selected.length) html += `<div class="picker-group-label">Plantel</div>`;
+    html += unselected.map(p=>pickerRowHtml(p,false)).join('');
+  }
+  if(all.length===0) html += `<p>Tu plantel está vacío. Agrega jugadores desde "✎ Plantel".</p>`;
+  return html;
+}
+function weekPlayerPickerModal(w){
   let html = `<div class="modal-bg" id="modalBg"><div class="modal">
     <h3>Convocar desde plantel</h3>
     <p>Toca para agregar o quitar del partido de hoy.</p>
     <input type="text" id="pickerSearch" placeholder="Buscar..." style="width:100%; margin-bottom:10px;">
-    <div id="pickerList">`;
-  const gk = roster().filter(p=>p.isGK);
-  const field = roster().filter(p=>!p.isGK);
-  function prow(p){
-    const sel = inWeek.has(p.id);
-    return `<div class="roster-row" data-pick-name="${escapeAttr(p.name.toLowerCase())}" data-pick="${p.id}" style="cursor:pointer;">
-      <span style="width:22px;height:22px;border-radius:6px;border:2px solid ${sel?'var(--win)':'var(--chalk-dim)'};background:${sel?'var(--win)':'none'};color:#0a1f10;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex-shrink:0;">${sel?'✓':''}</span>
-      <span style="flex:1;font-weight:600;font-size:13.5px;">${p.isGK?'🥅 ':''}${escapeHtml(p.name)}</span>
-    </div>`;
-  }
-  if(gk.length) html += gk.map(prow).join('');
-  if(field.length) html += field.map(prow).join('');
-  if(roster().length===0) html += `<p>Tu plantel está vacío. Agrega jugadores desde "✎ Plantel".</p>`;
-  html += `</div>
+    <div id="pickerList">${weekPickerListHtml(w)}</div>
     <div class="modal-actions">
       <button class="btn btn-gold btn-block" id="closePickerBtn">Listo</button>
     </div>
   </div></div>`;
+  return html;
+}
+
+function rosterRowHtml(p, w){
+  const inWeek = w && w.rows.some(r=>r.playerId===p.id);
+  return `<div class="roster-row" data-roster-row-name="${escapeAttr(normalizeSearch(p.name))}">
+    <input type="text" data-roster-name="${p.id}" value="${escapeAttr(p.name)}">
+    <button class="btn btn-xs ${p.isGK?'btn-gold':'btn-outline'}" data-roster-gk="${p.id}">${p.isGK?'🥅':'Arq.'}</button>
+    ${w ? `<button class="btn btn-xs ${inWeek?'btn-gold':'btn-outline'}" data-roster-convene="${p.id}">${inWeek?'✓ Hoy':'+ Hoy'}</button>` : ''}
+    ${p.phone
+      ? `<button class="btn btn-icon btn-wsp" data-roster-wsp="${p.id}" title="Enviar WhatsApp">💬</button>
+         <button class="btn btn-icon btn-outline" data-roster-phone-edit="${p.id}" title="Editar número">✎</button>`
+      : `<button class="btn btn-icon btn-outline" data-roster-phone-edit="${p.id}" title="Agregar número de WhatsApp">📞+</button>`
+    }
+    <button class="btn btn-xs btn-danger" data-roster-remove="${p.id}">✕</button>
+  </div>`;
+}
+// Mismo agrupado/filtro que "Desde plantel": los convocados de hoy arriba, agrupados.
+function rosterListHtml(w){
+  const all = roster();
+  if(all.length===0) return '';
+  if(!w) return sortGkFirst(all).map(p=>rosterRowHtml(p, w)).join('');
+  const inWeekIds = new Set(w.rows.map(r=>r.playerId));
+  const convocados = sortGkFirst(all.filter(p=>inWeekIds.has(p.id)));
+  const resto = sortGkFirst(all.filter(p=>!inWeekIds.has(p.id)));
+  let html = '';
+  if(convocados.length){
+    html += `<div class="picker-group-label">✓ Convocados (${convocados.length})</div>`;
+    html += convocados.map(p=>rosterRowHtml(p,w)).join('');
+  }
+  if(resto.length){
+    if(convocados.length) html += `<div class="picker-group-label">Plantel</div>`;
+    html += resto.map(p=>rosterRowHtml(p,w)).join('');
+  }
   return html;
 }
 
@@ -960,22 +1033,9 @@ function rosterEditorModal(){
         : `<p style="font-size:11px;color:var(--chalk-dim);">Agrega números de WhatsApp a los convocados de hoy para poder recordarles a todos de una.</p>`)
       : ''}
     </div>
-    <div id="rosterList">`;
-  roster().forEach(p=>{
-    const inWeek = w && w.rows.some(r=>r.playerId===p.id);
-    html += `<div class="roster-row">
-      <input type="text" data-roster-name="${p.id}" value="${escapeAttr(p.name)}">
-      <button class="btn btn-xs ${p.isGK?'btn-gold':'btn-outline'}" data-roster-gk="${p.id}">${p.isGK?'🥅':'Arq.'}</button>
-      ${w ? `<button class="btn btn-xs ${inWeek?'btn-gold':'btn-outline'}" data-roster-convene="${p.id}">${inWeek?'✓ Hoy':'+ Hoy'}</button>` : ''}
-      ${p.phone
-        ? `<button class="btn btn-icon btn-wsp" data-roster-wsp="${p.id}" title="Enviar WhatsApp">💬</button>
-           <button class="btn btn-icon btn-outline" data-roster-phone-edit="${p.id}" title="Editar número">✎</button>`
-        : `<button class="btn btn-icon btn-outline" data-roster-phone-edit="${p.id}" title="Agregar número de WhatsApp">📞+</button>`
-      }
-      <button class="btn btn-xs btn-danger" data-roster-remove="${p.id}">✕</button>
-    </div>`;
-  });
-  html += `</div>
+    <input type="text" id="rosterSearch" placeholder="Buscar..." style="width:100%; margin-bottom:10px;">
+    <div id="rosterList">${rosterListHtml(w)}</div>
+    ${roster().length===0 ? `<p style="color:var(--chalk-dim); font-size:12px; padding:8px 0;">Todavía no hay jugadores en el plantel.</p>` : ''}
     <div class="add-strip" style="border:none; padding:10px 0 0; background:none;">
       <input type="text" id="rosterAddInput" placeholder="Nuevo jugador...">
       <label class="gk-check"><input type="checkbox" id="rosterAddGK"> Arq.</label>
@@ -990,6 +1050,10 @@ function rosterEditorModal(){
 
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 function escapeAttr(s){ return escapeHtml(s); }
+// Normaliza texto para buscar sin importar tildes/mayúsculas (ej: "jose" encuentra "José")
+function normalizeSearch(s){
+  return (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
 
 /* ---------- EVENTS ---------- */
 function wireEvents(){
@@ -1073,7 +1137,7 @@ function wireEvents(){
     };
   };
 
-  qa('[data-view-week]').forEach(el=>{ el.onclick = ()=>{ historyViewId = el.dataset.viewWeek; tab='sabado'; render(); }; });
+  qa('[data-view-week]').forEach(el=>{ el.onclick = ()=>{ pushNav(); historyViewId = el.dataset.viewWeek; tab='sabado'; render(); }; });
 
   qa('[data-delete-week]').forEach(btn=>{
     btn.onclick = (e)=>{
@@ -1195,34 +1259,40 @@ function wirePickerModal(w){
   const q = sel => document.querySelector(sel);
   const qa = sel => document.querySelectorAll(sel);
 
-  qa('[data-pick]').forEach(el=>{
-    el.onclick = ()=>{
-      const id = el.dataset.pick;
-      const idx = w.rows.findIndex(r=>r.playerId===id);
-      if(idx>=0){
-        w.rows.splice(idx,1);
-      } else {
-        const rp = roster().find(p=>p.id===id);
-        if(!rp) return;
-        if(!canAddToWeek(w, rp.isGK)){
-          showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
-          return;
-        }
-        w.rows.push(makeRow(rp));
-      }
-      saveData();
-      const nowSel = w.rows.some(r=>r.playerId===id);
-      const badge = el.querySelector('span');
-      badge.style.borderColor = nowSel ? 'var(--win)' : 'var(--chalk-dim)';
-      badge.style.background = nowSel ? 'var(--win)' : 'none';
-      badge.textContent = nowSel ? '✓' : '';
-    };
-  });
-  const search = q('#pickerSearch');
-  if(search) search.oninput = ()=>{
-    const v = search.value.toLowerCase();
+  function applyFilter(){
+    const search = q('#pickerSearch');
+    const v = normalizeSearch(search ? search.value : '');
     qa('[data-pick-name]').forEach(el=>{ el.style.display = el.dataset.pickName.includes(v) ? 'flex' : 'none'; });
-  };
+  }
+
+  function wireRows(){
+    qa('[data-pick]').forEach(el=>{
+      el.onclick = ()=>{
+        const id = el.dataset.pick;
+        const idx = w.rows.findIndex(r=>r.playerId===id);
+        if(idx>=0){
+          w.rows.splice(idx,1);
+        } else {
+          const rp = roster().find(p=>p.id===id);
+          if(!rp) return;
+          if(!canAddToWeek(w, rp.isGK)){
+            showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
+            return;
+          }
+          w.rows.push(makeRow(rp));
+        }
+        saveData();
+        const list = q('#pickerList');
+        if(list) list.innerHTML = weekPickerListHtml(w);
+        wireRows();
+        applyFilter();
+      };
+    });
+  }
+  wireRows();
+
+  const search = q('#pickerSearch');
+  if(search) search.oninput = applyFilter;
   const closeBtn = q('#closePickerBtn');
   if(closeBtn) closeBtn.onclick = ()=>{ closeModal(); render(); };
 }
@@ -1291,70 +1361,87 @@ function wireRosterModal(){
   const q = sel => document.querySelector(sel);
   const qa = sel => document.querySelectorAll(sel);
 
-  qa('[data-roster-name]').forEach(inp=>{
-    inp.onchange = ()=>{
-      const p = roster().find(x=>x.id===inp.dataset.rosterName);
-      p.name = inp.value.trim() || p.name;
-      const w = getCurrentWeek();
-      if(w){ w.rows.filter(r=>r.playerId===p.id).forEach(r=> r.name = p.name); }
-      saveData();
-    };
-  });
-  qa('[data-roster-gk]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const p = roster().find(x=>x.id===btn.dataset.rosterGk);
-      p.isGK = !p.isGK;
-      saveData();
-      btn.className = 'btn btn-xs ' + (p.isGK?'btn-gold':'btn-outline');
-      btn.textContent = p.isGK ? '🥅' : 'Arq.';
-    };
-  });
-  qa('[data-roster-remove]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const pid = btn.dataset.rosterRemove;
-      data().roster = roster().filter(x=>x.id!==pid);
-      const w = getCurrentWeek();
-      if(w) w.rows = w.rows.filter(r=>r.playerId!==pid);
-      saveData();
-      btn.closest('.roster-row').remove();
-    };
-  });
-  qa('[data-roster-convene]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const w = getCurrentWeek();
-      if(!w) return;
-      const pid = btn.dataset.rosterConvene;
-      const idx = w.rows.findIndex(r=>r.playerId===pid);
-      if(idx>=0){
-        w.rows.splice(idx,1);
-      } else {
-        const rp = roster().find(p=>p.id===pid);
-        if(!rp) return;
-        if(!canAddToWeek(w, rp.isGK)){
-          showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
-          return;
+  function applyFilter(){
+    const search = q('#rosterSearch');
+    const v = normalizeSearch(search ? search.value : '');
+    qa('[data-roster-row-name]').forEach(el=>{ el.style.display = el.dataset.rosterRowName.includes(v) ? 'flex' : 'none'; });
+  }
+
+  function refreshList(){
+    const w = getCurrentWeek();
+    const list = q('#rosterList');
+    if(list) list.innerHTML = rosterListHtml(w);
+    wireRows();
+    applyFilter();
+  }
+
+  function wireRows(){
+    qa('[data-roster-name]').forEach(inp=>{
+      inp.onchange = ()=>{
+        const p = roster().find(x=>x.id===inp.dataset.rosterName);
+        p.name = inp.value.trim() || p.name;
+        const w = getCurrentWeek();
+        if(w){ w.rows.filter(r=>r.playerId===p.id).forEach(r=> r.name = p.name); }
+        saveData();
+      };
+    });
+    qa('[data-roster-gk]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const p = roster().find(x=>x.id===btn.dataset.rosterGk);
+        p.isGK = !p.isGK;
+        saveData();
+        refreshList();
+      };
+    });
+    qa('[data-roster-remove]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const pid = btn.dataset.rosterRemove;
+        data().roster = roster().filter(x=>x.id!==pid);
+        const w = getCurrentWeek();
+        if(w) w.rows = w.rows.filter(r=>r.playerId!==pid);
+        saveData();
+        refreshList();
+      };
+    });
+    qa('[data-roster-convene]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const w = getCurrentWeek();
+        if(!w) return;
+        const pid = btn.dataset.rosterConvene;
+        const idx = w.rows.findIndex(r=>r.playerId===pid);
+        if(idx>=0){
+          w.rows.splice(idx,1);
+        } else {
+          const rp = roster().find(p=>p.id===pid);
+          if(!rp) return;
+          if(!canAddToWeek(w, rp.isGK)){
+            showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
+            return;
+          }
+          w.rows.push(makeRow(rp));
         }
-        w.rows.push(makeRow(rp));
-      }
-      saveData();
-      const nowIn = w.rows.some(r=>r.playerId===pid);
-      btn.className = 'btn btn-xs ' + (nowIn?'btn-gold':'btn-outline');
-      btn.textContent = nowIn ? '✓ Hoy' : '+ Hoy';
-    };
-  });
-  qa('[data-roster-phone-edit]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const p = roster().find(x=>x.id===btn.dataset.rosterPhoneEdit);
-      if(!p) return;
-      openPhoneEditModal(p);
-    };
-  });
-  qa('[data-roster-wsp]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const p = roster().find(x=>x.id===btn.dataset.rosterWsp);
-      sendWsp(p);
-    };
-  });
+        saveData();
+        refreshList();
+      };
+    });
+    qa('[data-roster-phone-edit]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const p = roster().find(x=>x.id===btn.dataset.rosterPhoneEdit);
+        if(!p) return;
+        openPhoneEditModal(p);
+      };
+    });
+    qa('[data-roster-wsp]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const p = roster().find(x=>x.id===btn.dataset.rosterWsp);
+        sendWsp(p);
+      };
+    });
+  }
+  wireRows();
+
+  const search = q('#rosterSearch');
+  if(search) search.oninput = applyFilter;
 
   let bulkQueue = [];
   let bulkIndex = 0;
@@ -1461,6 +1548,7 @@ function wireCampeonatoSwitcherModal(){
 
   qa('[data-select-campeonato]').forEach(btn=>{
     btn.onclick = ()=>{
+      pushNav();
       sd.activeId = btn.dataset.selectCampeonato;
       saveData(); closeModal();
       campTab='fechas'; historyViewId=null; render();
@@ -1946,6 +2034,40 @@ function wireCampPickerModal(f){
   if(closeBtn) closeBtn.onclick = ()=>{ closeModal(); render(); };
 }
 
+function campRosterRowHtml(p, f){
+  const inFecha = f && f.rows.some(r=>r.playerId===p.id);
+  return `<div class="roster-row" data-camp-roster-row-name="${escapeAttr(normalizeSearch(p.name))}">
+    <input type="text" data-camp-roster-name="${p.id}" value="${escapeAttr(p.name)}">
+    <button class="btn btn-xs ${p.isGK?'btn-gold':'btn-outline'}" data-camp-roster-gk="${p.id}">${p.isGK?'🥅':'Arq.'}</button>
+    ${f ? `<button class="btn btn-xs ${inFecha?'btn-gold':'btn-outline'}" data-camp-roster-convene="${p.id}">${inFecha?'✓ Hoy':'+ Hoy'}</button>` : ''}
+    ${p.phone
+      ? `<button class="btn btn-icon btn-wsp" data-camp-roster-wsp="${p.id}" title="Enviar WhatsApp">💬</button>
+         <button class="btn btn-icon btn-outline" data-camp-roster-phone-edit="${p.id}" title="Editar número">✎</button>`
+      : `<button class="btn btn-icon btn-outline" data-camp-roster-phone-edit="${p.id}" title="Agregar número de WhatsApp">📞+</button>`
+    }
+    <button class="btn btn-xs btn-danger" data-camp-roster-archive="${p.id}" title="Archivar jugador">📦</button>
+  </div>`;
+}
+// Mismo agrupado/filtro que "Desde plantel": los convocados de hoy arriba, agrupados.
+function campRosterListHtml(f){
+  const activePlayers = roster().filter(p=>!p.archived);
+  if(activePlayers.length===0) return '';
+  if(!f) return sortGkFirst(activePlayers).map(p=>campRosterRowHtml(p, f)).join('');
+  const inFechaIds = new Set(f.rows.map(r=>r.playerId));
+  const convocados = sortGkFirst(activePlayers.filter(p=>inFechaIds.has(p.id)));
+  const resto = sortGkFirst(activePlayers.filter(p=>!inFechaIds.has(p.id)));
+  let html = '';
+  if(convocados.length){
+    html += `<div class="picker-group-label">✓ Convocados (${convocados.length})</div>`;
+    html += convocados.map(p=>campRosterRowHtml(p,f)).join('');
+  }
+  if(resto.length){
+    if(convocados.length) html += `<div class="picker-group-label">Plantel</div>`;
+    html += resto.map(p=>campRosterRowHtml(p,f)).join('');
+  }
+  return html;
+}
+
 function campRosterEditorModal(){
   const f = getCurrentFecha();
   const convocados = f ? f.rows.map(r=>roster().find(p=>p.id===r.playerId)).filter(p=>p && p.phone) : [];
@@ -1960,25 +2082,9 @@ function campRosterEditorModal(){
         : `<p style="font-size:11px;color:var(--chalk-dim);">Agrega números de WhatsApp a los convocados de hoy para poder recordarles a todos de una.</p>`)
       : ''}
     </div>
-    <div id="campRosterList">`;
-  activePlayers.forEach(p=>{
-    const inFecha = f && f.rows.some(r=>r.playerId===p.id);
-    html += `<div class="roster-row">
-      <input type="text" data-camp-roster-name="${p.id}" value="${escapeAttr(p.name)}">
-      <button class="btn btn-xs ${p.isGK?'btn-gold':'btn-outline'}" data-camp-roster-gk="${p.id}">${p.isGK?'🥅':'Arq.'}</button>
-      ${f ? `<button class="btn btn-xs ${inFecha?'btn-gold':'btn-outline'}" data-camp-roster-convene="${p.id}">${inFecha?'✓ Hoy':'+ Hoy'}</button>` : ''}
-      ${p.phone
-        ? `<button class="btn btn-icon btn-wsp" data-camp-roster-wsp="${p.id}" title="Enviar WhatsApp">💬</button>
-           <button class="btn btn-icon btn-outline" data-camp-roster-phone-edit="${p.id}" title="Editar número">✎</button>`
-        : `<button class="btn btn-icon btn-outline" data-camp-roster-phone-edit="${p.id}" title="Agregar número de WhatsApp">📞+</button>`
-      }
-      <button class="btn btn-xs btn-danger" data-camp-roster-archive="${p.id}" title="Archivar jugador">📦</button>
-    </div>`;
-  });
-  if(activePlayers.length===0){
-    html += `<p style="color:var(--chalk-dim); font-size:12px; padding:8px 0;">Todavía no hay jugadores en el plantel.</p>`;
-  }
-  html += `</div>`;
+    <input type="text" id="campRosterSearch" placeholder="Buscar..." style="width:100%; margin-bottom:10px;">
+    <div id="campRosterList">${campRosterListHtml(f)}</div>
+    ${activePlayers.length===0 ? `<p style="color:var(--chalk-dim); font-size:12px; padding:8px 0;">Todavía no hay jugadores en el plantel.</p>` : ''}`;
   if(archivedPlayers.length>0){
     html += `<details style="margin-top:10px;">
       <summary style="cursor:pointer; color:var(--chalk-dim); font-size:11.5px; font-weight:700; letter-spacing:0.3px;">📦 Archivados (${archivedPlayers.length}) — no se convocan ni pagan cuota, pero su historial se conserva</summary>
@@ -2094,82 +2200,99 @@ function wireCampRosterModal(){
   const q = sel => document.querySelector(sel);
   const qa = sel => document.querySelectorAll(sel);
 
-  qa('[data-camp-roster-name]').forEach(inp=>{
-    inp.onchange = ()=>{
-      const p = roster().find(x=>x.id===inp.dataset.campRosterName);
-      p.name = inp.value.trim() || p.name;
-      const f = getCurrentFecha();
-      if(f){ f.rows.filter(r=>r.playerId===p.id).forEach(r=> r.name = p.name); }
-      saveData();
-    };
-  });
-  qa('[data-camp-roster-gk]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const p = roster().find(x=>x.id===btn.dataset.campRosterGk);
-      p.isGK = !p.isGK;
-      saveData();
-      btn.className = 'btn btn-xs ' + (p.isGK?'btn-gold':'btn-outline');
-      btn.textContent = p.isGK ? '🥅' : 'Arq.';
-    };
-  });
-  qa('[data-camp-roster-archive]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const p = roster().find(x=>x.id===btn.dataset.campRosterArchive);
-      if(p) openCampArchiveConfirm(p);
-    };
-  });
-  qa('[data-camp-roster-restore]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const p = roster().find(x=>x.id===btn.dataset.campRosterRestore);
-      if(!p) return;
-      p.archived = false;
-      saveData();
-      reopenCampRosterModal();
-      showToast('Jugador restaurado ↩');
-    };
-  });
-  qa('[data-camp-roster-hard-delete]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const p = roster().find(x=>x.id===btn.dataset.campRosterHardDelete);
-      if(p) openCampHardDeleteConfirm(p);
-    };
-  });
-  qa('[data-camp-roster-convene]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const f = getCurrentFecha();
-      if(!f) return;
-      const pid = btn.dataset.campRosterConvene;
-      const idx = f.rows.findIndex(r=>r.playerId===pid);
-      if(idx>=0){
-        f.rows.splice(idx,1);
-      } else {
-        const rp = roster().find(p=>p.id===pid);
-        if(!rp) return;
-        if(!canAddToWeek(f, rp.isGK)){
-          showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en la fecha` : `Máximo ${MAX_FIELD} jugadores en la fecha`);
-          return;
+  function applyFilter(){
+    const search = q('#campRosterSearch');
+    const v = normalizeSearch(search ? search.value : '');
+    qa('[data-camp-roster-row-name]').forEach(el=>{ el.style.display = el.dataset.campRosterRowName.includes(v) ? 'flex' : 'none'; });
+  }
+
+  function refreshList(){
+    const f = getCurrentFecha();
+    const list = q('#campRosterList');
+    if(list) list.innerHTML = campRosterListHtml(f);
+    wireRows();
+    applyFilter();
+  }
+
+  function wireRows(){
+    qa('[data-camp-roster-name]').forEach(inp=>{
+      inp.onchange = ()=>{
+        const p = roster().find(x=>x.id===inp.dataset.campRosterName);
+        p.name = inp.value.trim() || p.name;
+        const f = getCurrentFecha();
+        if(f){ f.rows.filter(r=>r.playerId===p.id).forEach(r=> r.name = p.name); }
+        saveData();
+      };
+    });
+    qa('[data-camp-roster-gk]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const p = roster().find(x=>x.id===btn.dataset.campRosterGk);
+        p.isGK = !p.isGK;
+        saveData();
+        refreshList();
+      };
+    });
+    qa('[data-camp-roster-archive]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const p = roster().find(x=>x.id===btn.dataset.campRosterArchive);
+        if(p) openCampArchiveConfirm(p);
+      };
+    });
+    qa('[data-camp-roster-restore]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const p = roster().find(x=>x.id===btn.dataset.campRosterRestore);
+        if(!p) return;
+        p.archived = false;
+        saveData();
+        reopenCampRosterModal();
+        showToast('Jugador restaurado ↩');
+      };
+    });
+    qa('[data-camp-roster-hard-delete]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const p = roster().find(x=>x.id===btn.dataset.campRosterHardDelete);
+        if(p) openCampHardDeleteConfirm(p);
+      };
+    });
+    qa('[data-camp-roster-convene]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const f = getCurrentFecha();
+        if(!f) return;
+        const pid = btn.dataset.campRosterConvene;
+        const idx = f.rows.findIndex(r=>r.playerId===pid);
+        if(idx>=0){
+          f.rows.splice(idx,1);
+        } else {
+          const rp = roster().find(p=>p.id===pid);
+          if(!rp) return;
+          if(!canAddToWeek(f, rp.isGK)){
+            showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en la fecha` : `Máximo ${MAX_FIELD} jugadores en la fecha`);
+            return;
+          }
+          f.rows.push(makeCampRow(rp));
         }
-        f.rows.push(makeCampRow(rp));
-      }
-      saveData();
-      const nowIn = f.rows.some(r=>r.playerId===pid);
-      btn.className = 'btn btn-xs ' + (nowIn?'btn-gold':'btn-outline');
-      btn.textContent = nowIn ? '✓ Hoy' : '+ Hoy';
-    };
-  });
-  qa('[data-camp-roster-phone-edit]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const p = roster().find(x=>x.id===btn.dataset.campRosterPhoneEdit);
-      if(!p) return;
-      openCampPhoneEditModal(p);
-    };
-  });
-  qa('[data-camp-roster-wsp]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const p = roster().find(x=>x.id===btn.dataset.campRosterWsp);
-      sendWsp(p);
-    };
-  });
+        saveData();
+        refreshList();
+      };
+    });
+    qa('[data-camp-roster-phone-edit]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const p = roster().find(x=>x.id===btn.dataset.campRosterPhoneEdit);
+        if(!p) return;
+        openCampPhoneEditModal(p);
+      };
+    });
+    qa('[data-camp-roster-wsp]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const p = roster().find(x=>x.id===btn.dataset.campRosterWsp);
+        sendWsp(p);
+      };
+    });
+  }
+  wireRows();
+
+  const search = q('#campRosterSearch');
+  if(search) search.oninput = applyFilter;
 
   let bulkQueue = [];
   let bulkIndex = 0;
@@ -2417,7 +2540,7 @@ function wireCampeonatoEvents(){
     };
   };
 
-  qa('[data-view-camp-fecha]').forEach(el=>{ el.onclick = ()=>{ historyViewId = el.dataset.viewCampFecha; campTab='fechas'; render(); }; });
+  qa('[data-view-camp-fecha]').forEach(el=>{ el.onclick = ()=>{ pushNav(); historyViewId = el.dataset.viewCampFecha; campTab='fechas'; render(); }; });
 
   qa('[data-delete-camp-fecha]').forEach(btn=>{
     btn.onclick = (e)=>{
@@ -2528,10 +2651,17 @@ function openModal(html){
 }
 function closeModal(){ const m = document.getElementById('modalBg'); if(m) m.remove(); }
 
+// Si el usuario usa el botón/gesto de atrás del sistema (Android/navegador),
+// navegamos dentro de la app en vez de cerrarla o recargarla.
+window.addEventListener('popstate', ()=>{
+  if(navStack.length>0) goBack();
+});
+
 /* ---------- INIT ---------- */
 (async function init(){
   document.getElementById('app').innerHTML = `<div class="empty" style="padding-top:70px;"><span class="ico">⚽</span><p>Cargando...</p></div>`;
   await loadData();
+  try{ history.replaceState({ navDepth: 0 }, ''); }catch(e){}
   render();
 })();
 </script>
