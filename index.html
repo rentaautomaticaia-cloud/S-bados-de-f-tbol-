@@ -916,6 +916,7 @@ function renderSheet(w, cellsLocked, showAdd){
   if(showAdd){
     html += `<div class="add-strip">
       <button class="btn btn-outline btn-xs" id="pickFromRosterBtn">👥 Desde plantel</button>
+      <button class="btn btn-outline btn-xs" id="downloadConvocadosBtn" title="Descargar convocados como imagen">🖼️⬇️</button>
       <input type="text" id="quickAddInput" placeholder="Jugador nuevo...">
       <label class="gk-check"><input type="checkbox" id="quickAddGK"> Arq.</label>
       <button class="btn btn-gold btn-xs" id="quickAddBtn">+</button>
@@ -1055,6 +1056,151 @@ function normalizeSearch(s){
   return (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
 }
 
+/* ---------- DESCARGAR CONVOCADOS COMO IMAGEN ---------- */
+function buildConvocadosCanvas(items, meta){
+  const W = 720;
+  const PAD = 26;
+  const rowH = 56;
+  const headerH = 168;
+  const footerH = 46;
+  const H = headerH + Math.max(items.length,1)*rowH + footerH;
+
+  const canvas = document.createElement('canvas');
+  const scale = 2; // nitidez para pantallas retina
+  canvas.width = W*scale; canvas.height = H*scale;
+  canvas.style.width = W+'px'; canvas.style.height = H+'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+
+  // fondo
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#101a12');
+  grad.addColorStop(1,'#0a120b');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,W,H);
+
+  // franja superior dorada
+  ctx.fillStyle = '#FFC94D';
+  ctx.fillRect(0,0,W,5);
+
+  // header
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#FFC94D';
+  ctx.font = '800 30px Arial';
+  ctx.fillText(meta.title, W/2, 56);
+
+  if(meta.sub){
+    ctx.fillStyle = '#C9D0D3';
+    ctx.font = '600 16px Arial';
+    ctx.fillText(meta.sub, W/2, 84);
+  }
+
+  ctx.fillStyle = '#93A0A8';
+  ctx.font = '700 13px monospace';
+  ctx.fillText(`${items.length} JUGADOR${items.length===1?'':'ES'} CONVOCADO${items.length===1?'':'S'}`, W/2, 112);
+
+  // pill contador dorado
+  ctx.strokeStyle = 'rgba(255,201,77,0.5)';
+  ctx.lineWidth = 1.5;
+  const pillW = 168, pillH = 26;
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(W/2 - pillW/2, 122, pillW, pillH, 13) : ctx.rect(W/2 - pillW/2, 122, pillW, pillH);
+  ctx.stroke();
+
+  // divisor
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.beginPath();
+  ctx.moveTo(PAD, headerH-8);
+  ctx.lineTo(W-PAD, headerH-8);
+  ctx.stroke();
+
+  // filas
+  if(items.length===0){
+    ctx.fillStyle = '#93A0A8';
+    ctx.font = '600 16px Arial';
+    ctx.fillText('Todavía no hay jugadores convocados', W/2, headerH + rowH/2 + 6);
+  } else {
+    items.forEach((p,i)=>{
+      const y = headerH + i*rowH;
+      if(i%2===0){
+        ctx.fillStyle = 'rgba(255,255,255,0.035)';
+        ctx.fillRect(PAD-6, y+2, W-2*(PAD-6), rowH-8);
+      }
+      // numero
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#FFC94D';
+      ctx.font = '700 17px monospace';
+      ctx.fillText(`${i+1}.`, PAD+38, y+rowH/2+6);
+      // nombre
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#F5F6F2';
+      ctx.font = '700 20px Arial';
+      ctx.fillText(`${p.isGK?'🥅':'⚽'}  ${p.name}`, PAD+52, y+rowH/2+7);
+      // check de llegada (si aplica)
+      if(p.arrived){
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#37D67A';
+        ctx.font = '700 16px Arial';
+        ctx.fillText('✓', W-PAD, y+rowH/2+6);
+      }
+    });
+  }
+
+  // footer
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#5f6b70';
+  ctx.font = '700 11px monospace';
+  ctx.fillText('⚽ FÚTBOL · LISTA DE CONVOCADOS', W/2, H-18);
+
+  return canvas;
+}
+
+function downloadCanvasAsImage(canvas, filename){
+  canvas.toBlob(blob=>{
+    if(!blob){ showToast('No se pudo generar la imagen'); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 3000);
+    showToast('Imagen descargada 🖼️');
+  }, 'image/png');
+}
+
+function convocadosItemsFromRows(rows){
+  const gk = rows.filter(r=>r.isGK);
+  const field = rows.filter(r=>!r.isGK);
+  return [...gk, ...field].map(r=>({ name:r.name, isGK:r.isGK, arrived:!!r.arrived }));
+}
+
+function downloadConvocadosSabado(){
+  const w = getCurrentWeek();
+  if(!w){ showToast('No hay partido activo'); return; }
+  const info = modeInfo();
+  const items = convocadosItemsFromRows(w.rows);
+  const canvas = buildConvocadosCanvas(items, {
+    title: '⚽ CONVOCADOS',
+    sub: `${fmtDateLong(w.date)} · ${fmtHora12(w.hora||info.defaultHora)} · ${w.lugar||info.defaultLugar}`
+  });
+  downloadCanvasAsImage(canvas, `convocados-${w.date}.png`);
+}
+
+function downloadConvocadosCamp(){
+  const f = getCurrentFecha();
+  if(!f){ showToast('No hay fecha activa'); return; }
+  const info = modeInfo();
+  const c = activeCampeonato();
+  const items = convocadosItemsFromRows(f.rows);
+  const canvas = buildConvocadosCanvas(items, {
+    title: '🏆 CONVOCADOS',
+    sub: `${c?c.nombre+' · ':''}${fmtDateLong(f.date)} · ${fmtHora12(f.hora||info.defaultHora)} · ${f.lugar||info.defaultLugar}`
+  });
+  downloadCanvasAsImage(canvas, `convocados-${f.date}.png`);
+}
+
 /* ---------- EVENTS ---------- */
 function wireEvents(){
   const q = sel => document.querySelector(sel);
@@ -1098,6 +1244,9 @@ function wireEvents(){
     openModal(weekPlayerPickerModal(w));
     wirePickerModal(w);
   };
+
+  const downloadConvocadosBtn = q('#downloadConvocadosBtn');
+  if(downloadConvocadosBtn) downloadConvocadosBtn.onclick = downloadConvocadosSabado;
 
   const backBtn = q('#backToCurrentBtn');
   if(backBtn) backBtn.onclick = ()=>{
@@ -1771,6 +1920,7 @@ function renderCampSheet(f, cellsLocked, showAdd){
   if(showAdd){
     html += `<div class="add-strip">
       <button class="btn btn-outline btn-xs" id="campPickFromRosterBtn">👥 Desde plantel</button>
+      <button class="btn btn-outline btn-xs" id="campDownloadConvocadosBtn" title="Descargar convocados como imagen">🖼️⬇️</button>
       <input type="text" id="campQuickAddInput" placeholder="Jugador nuevo...">
       <label class="gk-check"><input type="checkbox" id="campQuickAddGK"> Arq.</label>
       <button class="btn btn-gold btn-xs" id="campQuickAddBtn">+</button>
@@ -2501,6 +2651,9 @@ function wireCampeonatoEvents(){
     openModal(campPlayerPickerModal(f));
     wireCampPickerModal(f);
   };
+
+  const campDownloadConvocadosBtn = q('#campDownloadConvocadosBtn');
+  if(campDownloadConvocadosBtn) campDownloadConvocadosBtn.onclick = downloadConvocadosCamp;
 
   const backBtn = q('#backToCurrentFechaBtn');
   if(backBtn) backBtn.onclick = ()=>{
