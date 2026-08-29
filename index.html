@@ -58,16 +58,29 @@
   .col-total{ width:34px; }
 
   .mode-switch{ display:flex; gap:6px; margin-bottom:8px; }
-  .mode-switch button{
-    flex:1; font-family:'JetBrains Mono'; font-weight:700; font-size:10.5px; letter-spacing:0.3px;
-    text-transform:uppercase; padding:9px 4px; border-radius:9px; border:1px solid rgba(123,97,255,0.35);
-    background:var(--surface); color:var(--chalk-dim); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;
-    transition:box-shadow .15s ease;
+  .ms-chamfer{
+    flex:1; padding:1.5px;
+    background:rgba(123,97,255,0.4);
+    clip-path: polygon(15.5px 0, 100% 0, 100% calc(100% - 15.5px), calc(100% - 15.5px) 100%, 0 100%, 0 15.5px);
+    transition:background .15s ease, box-shadow .15s ease;
   }
-  .mode-switch button.active{
-    background:linear-gradient(135deg, rgba(0,245,160,0.24), rgba(0,245,160,0.06));
-    border-color:var(--gold); color:var(--gold);
-    box-shadow:0 0 14px rgba(0,245,160,0.35), inset 0 0 10px rgba(0,245,160,0.08);
+  .ms-chamfer.active{
+    background:var(--gold);
+    box-shadow:0 0 14px rgba(0,245,160,0.45);
+  }
+  .ms-chamfer button{
+    width:100%; height:100%; border:none; cursor:pointer; margin:0;
+    display:flex; align-items:center; justify-content:center; gap:5px;
+    font-family:'JetBrains Mono'; font-weight:700; font-size:10.5px; letter-spacing:0.3px;
+    text-transform:uppercase; padding:9px 4px;
+    background:var(--surface); color:var(--chalk-dim);
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  }
+  .ms-chamfer.active button{
+    background:
+      linear-gradient(115deg, rgba(0,245,160,0.38) 0%, rgba(0,245,160,0.38) 20%, rgba(0,245,160,0.05) 34%, rgba(0,245,160,0.05) 100%),
+      var(--surface);
+    color:var(--gold);
     text-shadow:0 0 10px rgba(0,245,160,0.5);
   }
 
@@ -81,11 +94,16 @@
   .back-btn svg{ width:17px; height:17px; display:block; }
   .back-btn:active{ transform:scale(0.92); background:var(--surface-2); }
 
+  .csb-chamfer{
+    padding:1.5px; margin-bottom:8px;
+    background:rgba(123,97,255,0.4);
+    clip-path: polygon(13.5px 0, 100% 0, 100% calc(100% - 13.5px), calc(100% - 13.5px) 100%, 0 100%, 0 13.5px);
+  }
   .camp-selector-bar{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
-    background:var(--surface); border:1px solid var(--purple); border-color:rgba(123,97,255,0.4);
-    border-radius:9px;
-    padding:8px 11px; margin-bottom:8px; cursor:pointer;
+    background:var(--surface);
+    padding:8px 11px; cursor:pointer;
+    clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
   }
   .camp-selector-bar .csb-name{ font-weight:700; font-size:12.5px; color:var(--gold); }
   .camp-selector-bar .csb-chevron{ font-size:11px; color:var(--cyan); font-family:'JetBrains Mono'; }
@@ -112,17 +130,75 @@
 
   .content{padding:6px 8px 8px;}
 
-  .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:10px;}
+  .card{
+    position:relative; isolation:isolate; background:transparent; border:none; border-radius:0;
+    padding:12px; margin-bottom:10px; --cut:16px;
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+  .card::after{
+    content:''; position:absolute; inset:0; z-index:-2; background:var(--line);
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+  .card::before{
+    content:''; position:absolute; inset:1px; z-index:-1; background:var(--surface);
+    clip-path: polygon(calc(var(--cut) - 1px) 0, 100% 0, 100% calc(100% - (var(--cut) - 1px)), calc(100% - (var(--cut) - 1px)) 100%, 0 100%, 0 calc(var(--cut) - 1px));
+  }
   .card h2{font-family:'Anton'; font-weight:400; text-transform:uppercase; font-size:15px; letter-spacing:0.4px; margin:0 0 8px; display:flex; align-items:center; gap:8px; justify-content:space-between;}
   .eyebrow{font-family:'JetBrains Mono'; font-size:10px; color:var(--cyan); letter-spacing:1.4px; text-transform:uppercase; font-weight:700; margin:0;}
 
-  .btn{font-family:'Inter'; font-weight:700; font-size:12.5px; border-radius:9px; border:1px solid var(--line); padding:7px 14px; cursor:pointer; background:var(--surface-2); color:var(--chalk); display:inline-flex; align-items:center; justify-content:center; gap:6px;}
+  /* Botones: esquina cortada limpia vía capas ::before/::after (sin tocar el HTML) */
+  .btn{
+    font-family:'Inter'; font-weight:700; font-size:12.5px; padding:7px 14px; cursor:pointer;
+    color:var(--chalk); display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    position:relative; isolation:isolate; background:transparent; border:none; border-radius:0; --cut:10px;
+  }
+  .btn:not(.btn-xs):not(.btn-icon){
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+  .btn:not(.btn-xs):not(.btn-icon)::after{
+    content:''; position:absolute; inset:0; z-index:-2; background:var(--line);
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+  .btn:not(.btn-xs):not(.btn-icon)::before{
+    content:''; position:absolute; inset:1.5px; z-index:-1; background:var(--surface-2);
+    clip-path: polygon(calc(var(--cut) - 1.5px) 0, 100% 0, 100% calc(100% - (var(--cut) - 1.5px)), calc(100% - (var(--cut) - 1.5px)) 100%, 0 100%, 0 calc(var(--cut) - 1.5px));
+  }
   .btn:active{transform:scale(0.98);}
-  .btn-gold{background:var(--gold); color:#04140d; border:none; box-shadow:0 0 14px rgba(0,245,160,0.35);}
-  .btn-outline{background:transparent; border:1px solid rgba(123,97,255,0.45); color:var(--purple);}
-  .btn-danger{background:transparent; color:var(--danger); border:1px solid rgba(255,59,48,0.4);}
+
+  .btn-gold{ color:#04140d; box-shadow:0 0 14px rgba(0,245,160,0.35); }
+  .btn-gold:not(.btn-xs):not(.btn-icon)::after{ content:none; }
+  .btn-gold:not(.btn-xs):not(.btn-icon)::before{
+    inset:0; background:var(--gold);
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+
+  .btn-outline{ color:var(--purple); }
+  .btn-outline:not(.btn-xs):not(.btn-icon)::after{ background:rgba(123,97,255,0.55); }
+  .btn-outline:not(.btn-xs):not(.btn-icon)::before{ background:transparent; }
+
+  .btn-danger{ color:var(--danger); }
+  .btn-danger:not(.btn-xs):not(.btn-icon)::after{ background:rgba(255,59,48,0.5); }
+  .btn-danger:not(.btn-xs):not(.btn-icon)::before{ background:transparent; }
+
+  .btn-wsp{ color:#062b13; font-weight:800; }
+  .btn-wsp:not(.btn-xs):not(.btn-icon){ background:transparent; }
+  .btn-wsp:not(.btn-xs):not(.btn-icon)::after{ content:none; }
+  .btn-wsp:not(.btn-xs):not(.btn-icon)::before{
+    inset:0; background:#25D366;
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+  .btn-wsp:disabled{ opacity:0.35; cursor:not-allowed; }
+
   .btn-block{width:100%;}
-  .btn-xs{padding:5px 9px; font-size:11px; border-radius:7px;}
+
+  /* Botones chicos/íconos: quedan redondeados normales, muy pequeños para el corte */
+  .btn-xs, .btn-icon{ padding:5px 9px; font-size:11px; border-radius:7px; }
+  .btn-xs:not(.btn-outline):not(.btn-gold):not(.btn-danger):not(.btn-wsp),
+  .btn-icon:not(.btn-outline):not(.btn-gold):not(.btn-danger):not(.btn-wsp){ background:var(--surface-2); border:1px solid var(--line); color:var(--chalk); }
+  .btn-xs.btn-outline, .btn-icon.btn-outline{ background:transparent; border:1px solid rgba(123,97,255,0.45); color:var(--purple); }
+  .btn-xs.btn-gold, .btn-icon.btn-gold{ background:var(--gold); color:#04140d; border:none; box-shadow:0 0 10px rgba(0,245,160,0.3); }
+  .btn-xs.btn-danger, .btn-icon.btn-danger{ background:transparent; border:1px solid rgba(255,59,48,0.4); color:var(--danger); }
+  .btn-xs.btn-wsp, .btn-icon.btn-wsp{ background:#25D366; border:1px solid #25D366; }
   .btn:disabled{opacity:0.35; cursor:not-allowed;}
 
   input[type=text], input[type=number], input[type=date]{
@@ -140,8 +216,17 @@
   /* stat strip */
   .stats-strip{display:flex; gap:6px; overflow-x:auto; margin-bottom:10px; padding-bottom:2px;}
   .stat-chip{
-    flex:0 0 auto; background:var(--surface); border:1px solid var(--line); border-radius:10px;
-    padding:6px 10px; text-align:center; min-width:64px;
+    position:relative; isolation:isolate; flex:0 0 auto; background:transparent; border:none; border-radius:0;
+    padding:6px 10px; text-align:center; min-width:64px; --cut:8px;
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+  .stat-chip::after{
+    content:''; position:absolute; inset:0; z-index:-2; background:var(--line);
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  }
+  .stat-chip::before{
+    content:''; position:absolute; inset:1px; z-index:-1; background:var(--surface);
+    clip-path: polygon(calc(var(--cut) - 1px) 0, 100% 0, 100% calc(100% - (var(--cut) - 1px)), calc(100% - (var(--cut) - 1px)) 100%, 0 100%, 0 calc(var(--cut) - 1px));
   }
   .stat-chip .slabel{font-size:9px; color:var(--chalk-dim); text-transform:uppercase; letter-spacing:0.4px; font-weight:700;}
   .stat-chip .sval{font-family:'JetBrains Mono'; font-weight:700; font-size:14px; margin-top:1px;}
@@ -249,13 +334,12 @@
   .roster-row input[type=text]{ flex:1; min-width:0; padding:6px 7px; font-size:12.5px; }
   .roster-row .btn-xs{ flex:0 0 auto; padding:5px 7px; font-size:10.5px; white-space:nowrap; }
   .roster-row .btn-icon{ flex:0 0 auto; padding:5px 6px; font-size:11px; min-width:26px; }
-  .btn-wsp{ background:#25D366; border-color:#25D366; color:#062b13; font-weight:800; }
-  .btn-wsp:disabled{ opacity:0.35; cursor:not-allowed; }
 
   .toast{position:fixed; bottom:88px; left:50%; transform:translateX(-50%); background:var(--surface-3); border:1px solid var(--win); color:var(--win); padding:8px 14px; border-radius:30px; font-size:12.5px; font-weight:600; z-index:200; opacity:0; pointer-events:none; transition:opacity .25s ease; box-shadow:0 0 16px rgba(0,245,160,0.3);}
   .toast.show{opacity:1;}
 
-  .hist-item{display:flex; align-items:center; gap:12px; padding:11px; border:1px solid var(--line); border-radius:12px; background:var(--surface-2); margin-bottom:8px; cursor:pointer;}
+  .hist-item{display:flex; align-items:center; gap:12px; padding:11px; border:1px solid var(--line); border-radius:12px; background:var(--surface-2); margin-bottom:8px; cursor:pointer;
+  }
   .hist-date{font-family:'Anton'; font-size:20px; line-height:1; color:var(--chalk); width:48px; text-align:center;}
   .hist-date .dow{font-family:'JetBrains Mono'; font-size:8.5px; color:var(--gold); display:block; letter-spacing:1px; margin-bottom:2px;}
   .hist-info{flex:1;}
@@ -617,7 +701,7 @@ function rowSaldo(r, f){
 // Totales y tabla financiera del campeonato completo
 function resultBadgeHtml(f){
   if(!f.resultado) return '';
-  const map = { G: {txt:'Ganó', color:'var(--win)'}, P: {txt:'Perdió', color:'var(--lose)'}, E: {txt:'Empató', color:'var(--gold)'} };
+  const map = { G: {txt:'Ganó', color:'var(--win)'}, P: {txt:'Perdió', color:'var(--lose)'}, E: {txt:'Empató', color:'var(--cyan)'} };
   const r = map[f.resultado];
   if(!r) return '';
   const marcador = `${f.golesFavor||0}-${f.golesContra||0}`;
@@ -631,7 +715,7 @@ function campMarcadorLine(f){
   if(!f.rival) return '';
   const equipo = campEquipoNombre();
   if(f.resultado){
-    const map = { G:'var(--win)', P:'var(--lose)', E:'var(--gold)' };
+    const map = { G:'var(--win)', P:'var(--lose)', E:'var(--cyan)' };
     const color = map[f.resultado] || 'var(--chalk-dim)';
     return `<b>${escapeHtml(equipo)}</b> <span style="color:${color}; font-weight:800;">${f.golesFavor||0} - ${f.golesContra||0}</span> ${escapeHtml(f.rival)}`;
   }
@@ -765,8 +849,8 @@ function render(){
     <div class="wrap content" id="content">
       ${navStack.length>0 ? `<div class="back-bar"><button class="back-btn" id="globalBackBtn" title="Atrás" aria-label="Atrás">${BACK_ICON_SVG}</button></div>` : ''}
       <div class="mode-switch">
-        <button data-mode="sabado" class="${mode==='sabado'?'active':''}">${MODE_INFO.sabado.tabIcon} ${MODE_INFO.sabado.tabLabel}</button>
-        <button data-mode="semana" class="${mode==='semana'?'active':''}">${MODE_INFO.semana.tabIcon} ${MODE_INFO.semana.tabLabel}</button>
+        <div class="ms-chamfer ${mode==='sabado'?'active':''}"><button data-mode="sabado">${MODE_INFO.sabado.tabIcon} ${MODE_INFO.sabado.tabLabel}</button></div>
+        <div class="ms-chamfer ${mode==='semana'?'active':''}"><button data-mode="semana">${MODE_INFO.semana.tabIcon} ${MODE_INFO.semana.tabLabel}</button></div>
       </div>
       ${mode==='semana' ? campeonatoSelectorBarHtml() : ''}
       <div id="modeContent"></div>
@@ -870,9 +954,21 @@ function renderSabado(){
   return html;
 }
 
+// Ordena: 1) Ganador arriba / Perdedor abajo, 2) dentro de cada grupo, quien ya pagó completo arriba
+function sortByResultAndPayment(rows){
+  return [...rows].sort((a,b)=>{
+    const aWon = a.won===true ? 0 : 1;
+    const bWon = b.won===true ? 0 : 1;
+    if(aWon !== bWon) return aWon - bWon;
+    const aPaid = rowIsComplete(a) ? 0 : 1;
+    const bPaid = rowIsComplete(b) ? 0 : 1;
+    return aPaid - bPaid;
+  });
+}
+
 function renderSheet(w, cellsLocked, showAdd){
-  const gkRows = w.rows.filter(r=>r.isGK);
-  const fieldRows = w.rows.filter(r=>!r.isGK);
+  const gkRows = sortByResultAndPayment(w.rows.filter(r=>r.isGK));
+  const fieldRows = sortByResultAndPayment(w.rows.filter(r=>!r.isGK));
 
   function rowHtml(r, num, icon){
     const st = paymentStatus(r);
@@ -1663,9 +1759,11 @@ function campeonatoSelectorBarHtml(){
   const sd = semanaData();
   const nombre = c ? c.nombre : 'Sin campeonato';
   const extra = sd.campeonatos.length>1 ? ` <span style="color:var(--chalk-dim); font-weight:400;">(${sd.campeonatos.length} campeonatos)</span>` : '';
-  return `<div class="camp-selector-bar" id="campeonatoSelectorBtn">
-    <span class="csb-name">🏆 ${escapeHtml(nombre)}${extra}</span>
-    <span class="csb-chevron">▾ cambiar / crear</span>
+  return `<div class="csb-chamfer">
+    <div class="camp-selector-bar" id="campeonatoSelectorBtn">
+      <span class="csb-name">🏆 ${escapeHtml(nombre)}${extra}</span>
+      <span class="csb-chevron">▾ cambiar / crear</span>
+    </div>
   </div>`;
 }
 
@@ -2046,7 +2144,7 @@ function renderCampEstadisticaTab(){
     html += `<div class="eyebrow" style="margin:12px 0 6px;">Racha reciente</div>
     <div style="display:flex; gap:6px; margin-bottom:4px;">`;
     forma.forEach(f=>{
-      const map = { G:{t:'G',c:'var(--win)'}, P:{t:'P',c:'var(--lose)'}, E:{t:'E',c:'var(--gold)'} };
+      const map = { G:{t:'G',c:'var(--win)'}, P:{t:'P',c:'var(--lose)'}, E:{t:'E',c:'var(--cyan)'} };
       const info = map[f.resultado] || {t:'?',c:'var(--chalk-dim)'};
       html += `<div style="width:26px; height:26px; border-radius:50%; background:${info.c}; color:#0a0f0a; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:12px;">${info.t}</div>`;
     });
@@ -2068,7 +2166,7 @@ function renderCampEstadisticaTab(){
   } else {
     matches.forEach(f=>{
       const gf = f.golesFavor||0, gc = f.golesContra||0, dg = gf-gc;
-      const map = { G:'var(--win)', P:'var(--lose)', E:'var(--gold)' };
+      const map = { G:'var(--win)', P:'var(--lose)', E:'var(--cyan)' };
       const color = map[f.resultado] || 'var(--chalk-dim)';
       const pts = f.resultado==='G' ? 2 : f.resultado==='E' ? 1 : 0;
       const dgTxt = dg>0 ? `+${dg}` : `${dg}`;
