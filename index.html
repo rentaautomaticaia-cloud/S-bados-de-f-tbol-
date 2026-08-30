@@ -84,7 +84,22 @@
     text-shadow:0 0 10px rgba(0,245,160,0.5);
   }
 
-  .back-bar{ display:flex; align-items:center; margin-bottom:8px; min-height:32px; }
+  .back-bar{ display:flex; align-items:center; gap:8px; margin-bottom:8px; min-height:32px; }
+
+  .home-option{
+    display:flex; align-items:center; gap:14px;
+    background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:16px; margin-bottom:12px; cursor:pointer;
+  }
+  .home-option:active{ transform:scale(0.98); }
+  .home-option-icon{
+    width:48px; height:48px; border-radius:12px; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center; font-size:24px;
+  }
+  .home-option-text{ flex:1; min-width:0; }
+  .home-option-title{ font-family:'Anton'; font-weight:400; font-size:16px; text-transform:uppercase; letter-spacing:0.4px; color:var(--chalk); }
+  .home-option-sub{ font-size:11.5px; color:var(--chalk-dim); margin-top:2px; }
+  .home-option-arrow{ font-size:22px; color:var(--gold); flex:0 0 auto; }
   .back-btn{
     width:32px; height:32px; border-radius:50%; padding:0; flex:0 0 auto;
     border:1px solid var(--line); background:var(--surface); color:var(--gold);
@@ -268,8 +283,13 @@
   tr.row-gk .sticky-col{ background:#1a2245; }
   tr.row-gk:hover .sticky-col{ background:#212a52; }
   tr.row-arrived .sticky-col{ background:#122036; }
-  tr.row-complete td{ background: rgba(0,245,160,0.07); }
-  tr.row-complete .sticky-col{ background: #0f2a20; }
+  /* Fila ya pagada: se queda en su lugar, solo se ve gris/opaca (no cambia de color ni se mueve) */
+  tr.row-complete td{ background: rgba(255,255,255,0.015); }
+  tr.row-complete .sticky-col{ background: #131a2b; }
+  tr.row-complete .rname{ color:var(--chalk-dim); opacity:0.65; }
+  tr.row-complete .rownum, tr.row-complete .gk-tag{ opacity:0.45; }
+  tr.row-complete .cell-btn{ opacity:0.4; filter:saturate(0.4); }
+  tr.row-complete .dio-input, tr.row-complete .pago-val, tr.row-complete .vta-val{ opacity:0.45; }
   tr.row-action .sticky-col{ background:#2b230f; }
   tr.row-action td{ background: rgba(255,193,7,0.06); }
 
@@ -404,7 +424,7 @@ const MODE_INFO = {
 };
 
 let state = { data: { sabado: { roster: [], weeks: [] }, semana: { campeonatos: [], activeId: null } } };
-let mode = "sabado";
+let mode = "home";
 let tab = "sabado";
 let campTab = "fechas";
 let historyViewId = null;
@@ -473,13 +493,51 @@ const fmtK = n => {
 
 const STORAGE_KEY = 'futbol-data-v3';
 const hasClaudeStorage = () => (typeof window.storage !== 'undefined' && typeof window.storage.get === 'function');
+let lastSavedAt = null;
+
+// ---- IndexedDB: tercera copia local, independiente de localStorage ----
+// (en la mayoría de navegadores, "borrar caché" no toca IndexedDB ni localStorage;
+// solo "borrar datos del sitio" lo haría, por eso usamos varias capas)
+function idbOpen(){
+  return new Promise((resolve, reject)=>{
+    if(!window.indexedDB){ reject(new Error('no indexeddb')); return; }
+    const req = indexedDB.open('futbol-app-db', 1);
+    req.onupgradeneeded = ()=>{ try{ req.result.createObjectStore('kv'); }catch(e){} };
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+async function idbSet(key, value){
+  try{
+    const db = await idbOpen();
+    return await new Promise((resolve, reject)=>{
+      const tx = db.transaction('kv','readwrite');
+      tx.objectStore('kv').put(value, key);
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>reject(tx.error);
+    });
+  }catch(e){ return false; }
+}
+async function idbGet(key){
+  try{
+    const db = await idbOpen();
+    return await new Promise((resolve, reject)=>{
+      const tx = db.transaction('kv','readonly');
+      const req = tx.objectStore('kv').get(key);
+      req.onsuccess = ()=>resolve(req.result || null);
+      req.onerror = ()=>reject(req.error);
+    });
+  }catch(e){ return null; }
+}
 
 async function storageGet(key){
   if(hasClaudeStorage()){
     try{ const res = await window.storage.get(key, false); if(res && res.value) return res.value; }
-    catch(e){ /* fall through to localStorage */ }
+    catch(e){ /* fall through */ }
   }
-  try{ return localStorage.getItem(key); }catch(e){ return null; }
+  try{ const v = localStorage.getItem(key); if(v) return v; }catch(e){ /* fall through */ }
+  try{ const v = await idbGet(key); if(v) return v; }catch(e){ /* fall through */ }
+  return null;
 }
 async function storageSet(key, value){
   let ok = false;
@@ -487,6 +545,7 @@ async function storageSet(key, value){
     try{ await window.storage.set(key, value, false); ok = true; }catch(e){ /* fall through */ }
   }
   try{ localStorage.setItem(key, value); ok = true; }catch(e){ /* ignore */ }
+  try{ const idbOk = await idbSet(key, value); ok = ok || idbOk; }catch(e){ /* ignore */ }
   return ok;
 }
 
@@ -496,72 +555,82 @@ function ensureWeekDefaults(w, modeKey){
   if(!w.lugar) w.lugar = info.defaultLugar;
 }
 
+// Convierte cualquier formato (nuevo, viejo, o archivo importado) en un `state` válido.
+// La reutilizan tanto loadData() como la restauración desde archivo en la pantalla de Base de datos.
+function normalizeParsedIntoState(parsed){
+  let sabadoPart;
+
+  // ---- Sábados: nunca cambia su formato (roster + weeks) ----
+  if(parsed && parsed.data && parsed.data.sabado){
+    sabadoPart = parsed.data.sabado;
+  } else if(parsed && (parsed.roster || parsed.weeks)){
+    // Formato antiguo de una sola cancha (previo a los modos)
+    sabadoPart = { roster: parsed.roster || [], weeks: parsed.weeks || [] };
+  } else {
+    sabadoPart = { roster: DEFAULT_ROSTER.map(p=>({id:uid(), ...p})), weeks: [] };
+  }
+  if(!Array.isArray(sabadoPart.roster)) sabadoPart.roster = [];
+  if(!Array.isArray(sabadoPart.weeks)) sabadoPart.weeks = [];
+  sabadoPart.weeks.forEach(w=>ensureWeekDefaults(w,'sabado'));
+
+  // ---- Entre semana: uno o más campeonatos (cada uno con su roster + config + fechas) ----
+  const oldSemana = (parsed && parsed.data && parsed.data.semana) ? parsed.data.semana : null;
+  let semanaCampeonatos, semanaActiveId;
+
+  function normalizeCampeonato(c, nombreDefault){
+    const camp = {
+      id: c.id || uid(),
+      nombre: c.nombre || nombreDefault,
+      roster: Array.isArray(c.roster) ? c.roster : [],
+      config: c.config || null,
+      fechas: Array.isArray(c.fechas) ? c.fechas : []
+    };
+    camp.fechas.forEach(f=>{
+      ensureWeekDefaults(f,'semana');
+      if(f.rival===undefined) f.rival = '';
+      if(f.resultado===undefined) f.resultado = null;
+      if(f.golesFavor===undefined) f.golesFavor = 0;
+      if(f.golesContra===undefined) f.golesContra = 0;
+    });
+    if(camp.config && !camp.config.nombreEquipo) camp.config.nombreEquipo = 'Banda del Rey';
+    return camp;
+  }
+
+  if(oldSemana && Array.isArray(oldSemana.campeonatos)){
+    // Ya está en formato multi-campeonato
+    semanaCampeonatos = oldSemana.campeonatos.map((c,i)=>normalizeCampeonato(c, `Campeonato ${i+1}`));
+    semanaActiveId = oldSemana.activeId && semanaCampeonatos.some(c=>c.id===oldSemana.activeId)
+      ? oldSemana.activeId : (semanaCampeonatos[0] ? semanaCampeonatos[0].id : null);
+  } else if(oldSemana && Array.isArray(oldSemana.fechas)){
+    // Formato de un solo campeonato -> se convierte en el primero de la lista
+    const camp = normalizeCampeonato(oldSemana, 'Campeonato 1');
+    semanaCampeonatos = [camp];
+    semanaActiveId = camp.id;
+  } else if(oldSemana){
+    // Formato aún más antiguo (partido normal tipo sábado) -> se conserva el plantel
+    const camp = normalizeCampeonato({ roster: oldSemana.roster }, 'Campeonato 1');
+    semanaCampeonatos = [camp];
+    semanaActiveId = camp.id;
+  } else {
+    const camp = normalizeCampeonato({}, 'Campeonato 1');
+    semanaCampeonatos = [camp];
+    semanaActiveId = camp.id;
+  }
+  const semanaPart = { campeonatos: semanaCampeonatos, activeId: semanaActiveId };
+
+  state = { data: { sabado: sabadoPart, semana: semanaPart } };
+}
+
 async function loadData(){
   try{
     const raw = await storageGet(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
-      let sabadoPart;
-
-      // ---- Sábados: nunca cambia su formato (roster + weeks) ----
-      if(parsed && parsed.data && parsed.data.sabado){
-        sabadoPart = parsed.data.sabado;
-      } else if(parsed && (parsed.roster || parsed.weeks)){
-        // Formato antiguo de una sola cancha (previo a los modos)
-        sabadoPart = { roster: parsed.roster || [], weeks: parsed.weeks || [] };
-      } else {
-        sabadoPart = { roster: DEFAULT_ROSTER.map(p=>({id:uid(), ...p})), weeks: [] };
-      }
-      if(!Array.isArray(sabadoPart.roster)) sabadoPart.roster = [];
-      if(!Array.isArray(sabadoPart.weeks)) sabadoPart.weeks = [];
-      sabadoPart.weeks.forEach(w=>ensureWeekDefaults(w,'sabado'));
-
-      // ---- Entre semana: uno o más campeonatos (cada uno con su roster + config + fechas) ----
-      const oldSemana = (parsed && parsed.data && parsed.data.semana) ? parsed.data.semana : null;
-      let semanaCampeonatos, semanaActiveId;
-
-      function normalizeCampeonato(c, nombreDefault){
-        const camp = {
-          id: c.id || uid(),
-          nombre: c.nombre || nombreDefault,
-          roster: Array.isArray(c.roster) ? c.roster : [],
-          config: c.config || null,
-          fechas: Array.isArray(c.fechas) ? c.fechas : []
-        };
-        camp.fechas.forEach(f=>{
-          ensureWeekDefaults(f,'semana');
-          if(f.rival===undefined) f.rival = '';
-          if(f.resultado===undefined) f.resultado = null;
-          if(f.golesFavor===undefined) f.golesFavor = 0;
-          if(f.golesContra===undefined) f.golesContra = 0;
-        });
-        if(camp.config && !camp.config.nombreEquipo) camp.config.nombreEquipo = 'Banda del Rey';
-        return camp;
-      }
-
-      if(oldSemana && Array.isArray(oldSemana.campeonatos)){
-        // Ya está en formato multi-campeonato
-        semanaCampeonatos = oldSemana.campeonatos.map((c,i)=>normalizeCampeonato(c, `Campeonato ${i+1}`));
-        semanaActiveId = oldSemana.activeId && semanaCampeonatos.some(c=>c.id===oldSemana.activeId)
-          ? oldSemana.activeId : (semanaCampeonatos[0] ? semanaCampeonatos[0].id : null);
-      } else if(oldSemana && Array.isArray(oldSemana.fechas)){
-        // Formato de un solo campeonato -> se convierte en el primero de la lista
-        const camp = normalizeCampeonato(oldSemana, 'Campeonato 1');
-        semanaCampeonatos = [camp];
-        semanaActiveId = camp.id;
-      } else if(oldSemana){
-        // Formato aún más antiguo (partido normal tipo sábado) -> se conserva el plantel
-        const camp = normalizeCampeonato({ roster: oldSemana.roster }, 'Campeonato 1');
-        semanaCampeonatos = [camp];
-        semanaActiveId = camp.id;
-      } else {
-        const camp = normalizeCampeonato({}, 'Campeonato 1');
-        semanaCampeonatos = [camp];
-        semanaActiveId = camp.id;
-      }
-      const semanaPart = { campeonatos: semanaCampeonatos, activeId: semanaActiveId };
-
-      state = { data: { sabado: sabadoPart, semana: semanaPart } };
+      normalizeParsedIntoState(parsed);
+      try{
+        const savedAtRaw = localStorage.getItem(STORAGE_KEY+'-savedAt');
+        lastSavedAt = savedAtRaw ? new Date(savedAtRaw) : null;
+      }catch(e){ lastSavedAt = null; }
       return;
     }
     throw new Error('no data');
@@ -575,7 +644,10 @@ async function loadData(){
   }
 }
 async function saveData(){
-  const ok = await storageSet(STORAGE_KEY, JSON.stringify(state));
+  const json = JSON.stringify(state);
+  const ok = await storageSet(STORAGE_KEY, json);
+  lastSavedAt = new Date();
+  try{ localStorage.setItem(STORAGE_KEY+'-savedAt', lastSavedAt.toISOString()); }catch(e){}
   if(!ok) showToast('No se pudo guardar ⚠️');
 }
 
@@ -834,6 +906,30 @@ function render(){
   };
 
   const app = document.getElementById('app');
+
+  if(mode==='home'){
+    app.innerHTML = `<div class="wrap content" id="content">${renderHomeScreen()}</div>`;
+    wireHomeScreen();
+    requestAnimationFrame(()=>window.scrollTo(0, savedScroll.win));
+    return;
+  }
+
+  if(mode==='database'){
+    app.innerHTML = `
+      <div class="wrap content" id="content">
+        <div class="back-bar">
+          ${navStack.length>0 ? `<button class="back-btn" id="globalBackBtn" title="Atrás" aria-label="Atrás">${BACK_ICON_SVG}</button>` : ''}
+          <button class="back-btn" id="homeBtn" title="Inicio" aria-label="Inicio">🏠</button>
+        </div>
+        <div id="modeContent">${renderDatabaseScreen()}</div>
+      </div>`;
+    const gb0 = document.getElementById('globalBackBtn'); if(gb0) gb0.onclick = goBack;
+    const hb0 = document.getElementById('homeBtn'); if(hb0) hb0.onclick = goHome;
+    wireDatabaseScreen();
+    requestAnimationFrame(()=>window.scrollTo(0, savedScroll.win));
+    return;
+  }
+
   const tabbarHtml = mode==='sabado'
     ? `<div class="tabbar">
         <button data-tab="sabado" class="${tab==='sabado'?'active':''}"><span class="ico">⚽</span>Partido</button>
@@ -847,10 +943,9 @@ function render(){
       </div>`;
   app.innerHTML = `
     <div class="wrap content" id="content">
-      ${navStack.length>0 ? `<div class="back-bar"><button class="back-btn" id="globalBackBtn" title="Atrás" aria-label="Atrás">${BACK_ICON_SVG}</button></div>` : ''}
-      <div class="mode-switch">
-        <div class="ms-chamfer ${mode==='sabado'?'active':''}"><button data-mode="sabado">${MODE_INFO.sabado.tabIcon} ${MODE_INFO.sabado.tabLabel}</button></div>
-        <div class="ms-chamfer ${mode==='semana'?'active':''}"><button data-mode="semana">${MODE_INFO.semana.tabIcon} ${MODE_INFO.semana.tabLabel}</button></div>
+      <div class="back-bar">
+        ${navStack.length>0 ? `<button class="back-btn" id="globalBackBtn" title="Atrás" aria-label="Atrás">${BACK_ICON_SVG}</button>` : ''}
+        <button class="back-btn" id="homeBtn" title="Inicio" aria-label="Inicio">🏠</button>
       </div>
       ${mode==='semana' ? campeonatoSelectorBarHtml() : ''}
       <div id="modeContent"></div>
@@ -859,9 +954,10 @@ function render(){
   `;
   const globalBackBtn = document.getElementById('globalBackBtn');
   if(globalBackBtn) globalBackBtn.onclick = goBack;
+  const homeBtn = document.getElementById('homeBtn');
+  if(homeBtn) homeBtn.onclick = goHome;
   document.querySelectorAll('.tabbar [data-tab]').forEach(b=>{ b.onclick = ()=>{ if(tab!==b.dataset.tab){ pushNav(); tab=b.dataset.tab; historyViewId=null; render(); } }; });
   document.querySelectorAll('.tabbar [data-camptab]').forEach(b=>{ b.onclick = ()=>{ if(campTab!==b.dataset.camptab){ pushNav(); campTab=b.dataset.camptab; historyViewId=null; render(); } }; });
-  document.querySelectorAll('.mode-switch button').forEach(b=>{ b.onclick = ()=>{ if(mode!==b.dataset.mode){ pushNav(); mode=b.dataset.mode; tab='sabado'; campTab='fechas'; historyViewId=null; render(); } }; });
   const campSelectorBtn = document.getElementById('campeonatoSelectorBtn');
   if(campSelectorBtn) campSelectorBtn.onclick = ()=>{ openModal(campeonatoSwitcherModalHtml()); wireCampeonatoSwitcherModal(); };
   const content = document.getElementById('modeContent');
@@ -878,6 +974,194 @@ function render(){
     const ns = document.querySelector('.sheet-scroll');
     if(ns){ ns.scrollTop = savedScroll.sheetTop; ns.scrollLeft = savedScroll.sheetLeft; }
   });
+}
+
+function goHome(){
+  pushNav();
+  mode='home'; tab='sabado'; campTab='fechas'; historyViewId=null;
+  render();
+}
+
+function renderHomeScreen(){
+  return `
+    <div style="text-align:center; padding:22px 0 20px;">
+      <div style="font-size:46px; line-height:1;">⚽</div>
+      <div class="mini-title" style="font-size:11.5px; margin-top:10px; letter-spacing:1.2px;">Organizador de partidos</div>
+    </div>
+    <div class="home-option" data-home="sabado">
+      <div class="home-option-icon" style="background:rgba(0,245,160,0.12); color:var(--gold);">🗓️</div>
+      <div class="home-option-text">
+        <div class="home-option-title">Sábados</div>
+        <div class="home-option-sub">Partido semanal, plantel e historial</div>
+      </div>
+      <div class="home-option-arrow">›</div>
+    </div>
+    <div class="home-option" data-home="semana">
+      <div class="home-option-icon" style="background:rgba(123,97,255,0.16); color:var(--purple);">🏆</div>
+      <div class="home-option-text">
+        <div class="home-option-title">Campeonato</div>
+        <div class="home-option-sub">Fechas, finanzas y estadísticas</div>
+      </div>
+      <div class="home-option-arrow">›</div>
+    </div>
+    <div class="home-option" data-home="database">
+      <div class="home-option-icon" style="background:rgba(0,212,255,0.16); color:var(--cyan);">💾</div>
+      <div class="home-option-text">
+        <div class="home-option-title">Base de datos</div>
+        <div class="home-option-sub">Respaldo, exportar e importar</div>
+      </div>
+      <div class="home-option-arrow">›</div>
+    </div>
+  `;
+}
+function wireHomeScreen(){
+  document.querySelectorAll('[data-home]').forEach(el=>{
+    el.onclick = ()=>{
+      pushNav();
+      mode = el.dataset.home;
+      tab='sabado'; campTab='fechas'; historyViewId=null;
+      render();
+    };
+  });
+}
+
+/* ---------- BASE DE DATOS: respaldo, exportar, importar ---------- */
+function getDataStats(){
+  const sab = (state.data && state.data.sabado) ? state.data.sabado : {roster:[], weeks:[]};
+  const sem = (state.data && state.data.semana) ? state.data.semana : {campeonatos:[], activeId:null};
+  const camps = Array.isArray(sem.campeonatos) ? sem.campeonatos : [];
+  const fechasCount = camps.reduce((acc,c)=>acc + (Array.isArray(c.fechas) ? c.fechas.length : 0), 0);
+  return {
+    rosterSabado: Array.isArray(sab.roster) ? sab.roster.length : 0,
+    weeks: Array.isArray(sab.weeks) ? sab.weeks.length : 0,
+    campeonatos: camps.length,
+    fechas: fechasCount
+  };
+}
+function fmtDateTimeCo(d){
+  if(!d || isNaN(d.getTime())) return 'nunca';
+  return d.toLocaleString('es-CO', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+function renderDatabaseScreen(){
+  const stats = getDataStats();
+  let lastExport = null;
+  try{ lastExport = localStorage.getItem(STORAGE_KEY+'-lastExport'); }catch(e){}
+  return `
+    <div class="topline" style="margin-bottom:14px;">
+      <div>
+        <div class="eyebrow">Base de datos</div>
+        <div style="font-size:11px; color:var(--chalk-dim); margin-top:2px;">Tu información se guarda sola, pero aquí puedes respaldarla</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:13px;">📊 Resumen actual</h2>
+      <div style="font-size:12px; color:var(--chalk-dim); line-height:1.9;">
+        Jugadores en Sábados: <b style="color:var(--chalk);">${stats.rosterSabado}</b><br>
+        Partidos de Sábados guardados: <b style="color:var(--chalk);">${stats.weeks}</b><br>
+        Campeonatos: <b style="color:var(--chalk);">${stats.campeonatos}</b><br>
+        Fechas de campeonato guardadas: <b style="color:var(--chalk);">${stats.fechas}</b>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:13px;">🛡️ Respaldo automático</h2>
+      <div style="font-size:12px; color:var(--chalk-dim); line-height:1.7;">
+        Cada cambio se guarda solo, al instante, en <b style="color:var(--chalk);">3 copias locales</b> de este dispositivo (almacenamiento de la cuenta, del navegador y de la app). Con eso alcanza para que "borrar caché" no borre tus datos.<br><br>
+        Último guardado: <b style="color:var(--win);">${fmtDateTimeCo(lastSavedAt)}</b>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:13px;">📤 Copia de seguridad</h2>
+      <p style="margin-bottom:10px;">Descarga un archivo con todos tus datos. Guárdalo en Drive, WhatsApp o donde prefieras — así no pierdes nada ni cambiando de celular.</p>
+      <button class="btn btn-gold btn-block" id="exportDataBtn">⬇️ Descargar copia de seguridad</button>
+      <p style="margin-top:8px; font-size:10.5px; color:var(--chalk-dim);">Última descarga: ${lastExport ? escapeHtml(lastExport) : 'nunca'}</p>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:13px;">📥 Restaurar</h2>
+      <p style="margin-bottom:10px;">Sube un archivo de copia de seguridad para restaurar tus datos. <b style="color:var(--amber);">Esto reemplaza</b> lo que tienes ahora en este dispositivo.</p>
+      <input type="file" accept="application/json,.json" id="importDataInput" style="display:none;">
+      <button class="btn btn-outline btn-block" id="importDataBtn">⬆️ Restaurar desde archivo</button>
+    </div>
+  `;
+}
+function wireDatabaseScreen(){
+  const exportBtn = document.getElementById('exportDataBtn');
+  if(exportBtn) exportBtn.onclick = exportDataFile;
+  const importBtn = document.getElementById('importDataBtn');
+  const importInput = document.getElementById('importDataInput');
+  if(importBtn && importInput){
+    importBtn.onclick = ()=> importInput.click();
+    importInput.onchange = ()=>{
+      const file = importInput.files && importInput.files[0];
+      if(file) importDataFile(file);
+      importInput.value = '';
+    };
+  }
+}
+function exportDataFile(){
+  const payload = { app:'futbol-organizer', version:3, exportedAt:new Date().toISOString(), data: state.data };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `futbol-backup-${todayISO()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 3000);
+  const label = new Date().toLocaleString('es-CO', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  try{ localStorage.setItem(STORAGE_KEY+'-lastExport', label); }catch(e){}
+  showToast('Copia descargada 📥');
+  render();
+}
+function importDataFile(file){
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    let parsed;
+    try{ parsed = JSON.parse(e.target.result); }
+    catch(err){ showToast('No se pudo leer el archivo ⚠️'); return; }
+    const incoming = (parsed && parsed.data) ? parsed.data : parsed;
+    if(!incoming || (!incoming.sabado && !incoming.semana && !incoming.roster && !incoming.weeks)){
+      showToast('Ese archivo no parece una copia válida ⚠️');
+      return;
+    }
+    openModal(importConfirmModalHtml(incoming));
+    wireImportConfirmModal(parsed);
+  };
+  reader.onerror = ()=> showToast('No se pudo leer el archivo ⚠️');
+  reader.readAsText(file);
+}
+function importConfirmModalHtml(incoming){
+  const sab = incoming.sabado || ((incoming.roster || incoming.weeks) ? {roster:incoming.roster, weeks:incoming.weeks} : {});
+  const sem = incoming.semana || {};
+  const camps = Array.isArray(sem.campeonatos) ? sem.campeonatos : [];
+  const fechasCount = camps.reduce((acc,c)=>acc + (Array.isArray(c.fechas)?c.fechas.length:0), 0);
+  return `<div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>¿Restaurar esta copia?</h3>
+    <p>Este archivo tiene <b style="color:var(--chalk);">${(sab.roster||[]).length}</b> jugadores de Sábados, <b style="color:var(--chalk);">${(sab.weeks||[]).length}</b> partidos guardados, <b style="color:var(--chalk);">${camps.length}</b> campeonato(s) y <b style="color:var(--chalk);">${fechasCount}</b> fecha(s).</p>
+    <p style="color:var(--amber);">Esto reemplaza TODO lo que tienes guardado ahora mismo en este dispositivo. No se puede deshacer.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-block" id="cancelImportBtn">Cancelar</button>
+      <button class="btn btn-danger btn-block" id="confirmImportBtn">Restaurar y reemplazar</button>
+    </div>
+  </div></div>`;
+}
+function wireImportConfirmModal(parsed){
+  const cancelBtn = document.getElementById('cancelImportBtn');
+  if(cancelBtn) cancelBtn.onclick = closeModal;
+  const confirmBtn = document.getElementById('confirmImportBtn');
+  if(confirmBtn) confirmBtn.onclick = async ()=>{
+    normalizeParsedIntoState(parsed);
+    await saveData();
+    closeModal();
+    navStack = [];
+    mode='home'; tab='sabado'; campTab='fechas'; historyViewId=null;
+    render();
+    showToast('Datos restaurados ✓');
+  };
 }
 
 function phaseLabel(phase){ return phase==='armando' ? 'Armando lista' : phase==='jugando' ? 'En juego' : 'Finalizado'; }
@@ -954,21 +1238,18 @@ function renderSabado(){
   return html;
 }
 
-// Ordena: 1) Ganador arriba / Perdedor abajo, 2) dentro de cada grupo, quien ya pagó completo arriba
-function sortByResultAndPayment(rows){
+// Ordena solo por resultado: Ganador arriba, Perdedor abajo. El pago NO reordena la fila.
+function sortByResult(rows){
   return [...rows].sort((a,b)=>{
     const aWon = a.won===true ? 0 : 1;
     const bWon = b.won===true ? 0 : 1;
-    if(aWon !== bWon) return aWon - bWon;
-    const aPaid = rowIsComplete(a) ? 0 : 1;
-    const bPaid = rowIsComplete(b) ? 0 : 1;
-    return aPaid - bPaid;
+    return aWon - bWon;
   });
 }
 
 function renderSheet(w, cellsLocked, showAdd){
-  const gkRows = sortByResultAndPayment(w.rows.filter(r=>r.isGK));
-  const fieldRows = sortByResultAndPayment(w.rows.filter(r=>!r.isGK));
+  const gkRows = sortByResult(w.rows.filter(r=>r.isGK));
+  const fieldRows = sortByResult(w.rows.filter(r=>!r.isGK));
 
   function rowHtml(r, num, icon){
     const st = paymentStatus(r);
