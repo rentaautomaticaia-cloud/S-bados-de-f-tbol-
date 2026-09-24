@@ -2421,13 +2421,16 @@ function renderCampEstadisticaTab(){
   </div>`;
 
   if(matches.length>0){
-    const forma = matches.slice(-5); // últimos 5, orden cronológico
-    html += `<div class="eyebrow" style="margin:12px 0 6px;">Racha reciente</div>
-    <div style="display:flex; gap:6px; margin-bottom:4px;">`;
+    const forma = matches; // todas las fechas, orden cronológico
+    html += `<div class="eyebrow" style="margin:12px 0 6px;">Racha (todas las fechas)</div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px 6px; margin-bottom:4px;">`;
     forma.forEach(f=>{
       const map = { G:{t:'G',c:'var(--win)'}, P:{t:'P',c:'var(--lose)'}, E:{t:'E',c:'var(--cyan)'} };
       const info = map[f.resultado] || {t:'?',c:'var(--chalk-dim)'};
-      html += `<div style="width:26px; height:26px; border-radius:50%; background:${info.c}; color:#0a0f0a; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:12px;">${info.t}</div>`;
+      html += `<div style="display:flex; flex-direction:column; align-items:center; gap:2px;" title="Fecha ${fechaIndex(f)+1}">
+        <div style="width:26px; height:26px; border-radius:50%; background:${info.c}; color:#0a0f0a; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:12px;">${info.t}</div>
+        <div style="font-size:9px; color:var(--chalk-dim); line-height:1;">F${fechaIndex(f)+1}</div>
+      </div>`;
     });
     html += `</div>`;
   }
