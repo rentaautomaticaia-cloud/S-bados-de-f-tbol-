@@ -1536,13 +1536,82 @@ function normalizeSearch(s){
 }
 
 /* ---------- DESCARGAR CONVOCADOS COMO IMAGEN ---------- */
+function rr(ctx,x,y,w,h,r){
+  if(ctx.roundRect){ ctx.beginPath(); ctx.roundRect(x,y,w,h,r); return; }
+  const rad = Math.min(r, w/2, h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+rad,y);
+  ctx.arcTo(x+w,y,x+w,y+h,rad);
+  ctx.arcTo(x+w,y+h,x,y+h,rad);
+  ctx.arcTo(x,y+h,x,y,rad);
+  ctx.arcTo(x,y,x+w,y,rad);
+  ctx.closePath();
+}
+
+// Textura tipo malla de arco (red de portería): dos juegos de líneas diagonales,
+// simétricas y sutiles, para que el fondo no quede vacío.
+function drawNetTexture(ctx, x, y, w, h, radius, spacing, color){
+  ctx.save();
+  rr(ctx, x, y, w, h, radius);
+  ctx.clip();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  const diag = Math.sqrt(w*w + h*h);
+  ctx.translate(x + w/2, y + h/2);
+  for(let dir=0; dir<2; dir++){
+    ctx.save();
+    ctx.rotate(dir===0 ? Math.PI/4 : -Math.PI/4);
+    for(let off=-diag; off<=diag; off+=spacing){
+      ctx.beginPath();
+      ctx.moveTo(off, -diag);
+      ctx.lineTo(off, diag);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// Balón decorativo (círculo + pentágonos) para reforzar el tema, muy sutil.
+function drawGhostBall(ctx, cx, cy, r, color){
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+  const spikes = 5;
+  for(let i=0;i<spikes;i++){
+    const a = -Math.PI/2 + i*(Math.PI*2/spikes);
+    const x1 = cx + Math.cos(a)*r*0.42, y1 = cy + Math.sin(a)*r*0.42;
+    const x2 = cx + Math.cos(a)*r*0.92, y2 = cy + Math.sin(a)*r*0.92;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.42, 0, Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+
 function buildConvocadosCanvas(items, meta){
-  const W = 720;
-  const PAD = 26;
-  const rowH = 56;
-  const headerH = 168;
-  const footerH = 46;
-  const H = headerH + Math.max(items.length,1)*rowH + footerH;
+  const W = 760;
+  const OUTER = 22;          // margen exterior del marco (para el glow)
+  const FRAME_PAD = 30;      // padding interior del marco hasta el contenido
+  const contentX = OUTER + FRAME_PAD;
+  const contentW = W - 2*contentX;
+
+  // Con muchos convocados usamos 2 columnas simétricas para no alargar la imagen
+  const numCols = items.length > 10 ? 2 : 1;
+  const colGap = 16;
+  const colW = (contentW - (numCols-1)*colGap) / numCols;
+  const rowsPerCol = Math.max(1, Math.ceil(items.length / numCols));
+
+  const rowH = numCols===2 ? 58 : 68;
+  const rowGap = numCols===2 ? 10 : 12;
+  const listPad = 16;
+  const listItemsH = items.length>0 ? rowsPerCol*rowH + (rowsPerCol-1)*rowGap : rowH;
+
+  const headerH = 232;       // pelota + título + subtítulo + contador
+  const listH = listItemsH + 2*listPad;
+  const footerH = 74;
+
+  const H = OUTER + FRAME_PAD + headerH + 20 + listH + footerH + FRAME_PAD + OUTER;
 
   const canvas = document.createElement('canvas');
   const scale = 2; // nitidez para pantallas retina
@@ -1551,85 +1620,185 @@ function buildConvocadosCanvas(items, meta){
   const ctx = canvas.getContext('2d');
   ctx.scale(scale, scale);
 
-  // fondo
-  const grad = ctx.createLinearGradient(0,0,0,H);
-  grad.addColorStop(0,'#141d33');
+  // ---------- fondo ----------
+  const grad = ctx.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0,'#111a2e');
+  grad.addColorStop(0.55,'#0c1424');
   grad.addColorStop(1,'#0a0e18');
   ctx.fillStyle = grad;
   ctx.fillRect(0,0,W,H);
 
-  // franja superior neón
-  ctx.fillStyle = '#00F5A0';
-  ctx.fillRect(0,0,W,5);
+  // glows radiales sutiles
+  const g1 = ctx.createRadialGradient(W*0.12,H*0.02,0,W*0.12,H*0.02,W*0.55);
+  g1.addColorStop(0,'rgba(0,245,160,0.10)'); g1.addColorStop(1,'rgba(0,245,160,0)');
+  ctx.fillStyle=g1; ctx.fillRect(0,0,W,H);
+  const g2 = ctx.createRadialGradient(W*0.95,H*0.06,0,W*0.95,H*0.06,W*0.5);
+  g2.addColorStop(0,'rgba(123,97,255,0.12)'); g2.addColorStop(1,'rgba(123,97,255,0)');
+  ctx.fillStyle=g2; ctx.fillRect(0,0,W,H);
 
-  // header
+  // ---------- marco exterior redondeado con glow ----------
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,245,160,0.35)';
+  ctx.shadowBlur = 18;
+  ctx.strokeStyle = 'rgba(0,245,160,0.55)';
+  ctx.lineWidth = 2;
+  rr(ctx, OUTER, OUTER, W-2*OUTER, H-2*OUTER, 34);
+  ctx.stroke();
+  ctx.restore();
+  // relleno interior ligeramente distinto al fondo general
+  ctx.fillStyle = 'rgba(255,255,255,0.012)';
+  rr(ctx, OUTER+2, OUTER+2, W-2*OUTER-4, H-2*OUTER-4, 32);
+  ctx.fill();
+
+  // ---------- textura: malla de arco (red de portería), simétrica y sutil ----------
+  drawNetTexture(ctx, OUTER+2, OUTER+2, W-2*OUTER-4, H-2*OUTER-4, 32, 22, 'rgba(255,255,255,0.028)');
+  // balones fantasma simétricos en las esquinas superiores, muy tenues
+  drawGhostBall(ctx, OUTER+56, OUTER+56, 34, 'rgba(0,245,160,0.10)');
+  drawGhostBall(ctx, W-OUTER-56, OUTER+56, 34, 'rgba(0,245,160,0.10)');
+
+  let y = OUTER + FRAME_PAD;
+
+  // ---------- pelota ----------
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#00F5A0';
-  ctx.font = '800 30px Arial';
-  ctx.fillText(meta.title, W/2, 56);
+  ctx.font = '46px Arial';
+  ctx.fillText('⚽', W/2, y+44);
+  y += 74;
 
+  // ---------- título CONVOCADOS ----------
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,245,160,0.65)';
+  ctx.shadowBlur = 22;
+  ctx.fillStyle = '#00F5A0';
+  ctx.font = "400 62px 'Anton', Arial";
+  ctx.textAlign = 'center';
+  ctx.fillText((meta.title||'CONVOCADOS').toUpperCase(), W/2, y);
+  ctx.restore();
+  y += 46;
+
+  // ---------- subtítulo (fecha · hora · lugar) ----------
   if(meta.sub){
-    ctx.fillStyle = '#00D4FF';
-    ctx.font = '600 16px Arial';
-    ctx.fillText(meta.sub, W/2, 84);
+    ctx.fillStyle = '#8fa4f0';
+    ctx.font = '700 22px Arial';
+    ctx.fillText(meta.sub, W/2, y);
+    y += 34;
   }
 
+  // ---------- contador ----------
   ctx.fillStyle = '#8892A6';
   ctx.font = '700 13px monospace';
-  ctx.fillText(`${items.length} JUGADOR${items.length===1?'':'ES'} CONVOCADO${items.length===1?'':'S'}`, W/2, 112);
+  ctx.textAlign = 'center';
+  const countTxt = `${items.length} JUGADOR${items.length===1?'':'ES'} CONVOCADO${items.length===1?'':'S'}`;
+  ctx.save();
+  ctx.letterSpacing = '1.5px';
+  ctx.fillText(countTxt, W/2, y);
+  ctx.restore();
 
-  // pill contador
-  ctx.strokeStyle = 'rgba(0,245,160,0.5)';
+  y += 30;
+
+  // ---------- contenedor de la lista ----------
+  const listY = y;
+  ctx.strokeStyle = 'rgba(0,245,160,0.35)';
   ctx.lineWidth = 1.5;
-  const pillW = 168, pillH = 26;
-  ctx.beginPath();
-  ctx.roundRect ? ctx.roundRect(W/2 - pillW/2, 122, pillW, pillH, 13) : ctx.rect(W/2 - pillW/2, 122, pillW, pillH);
+  rr(ctx, contentX, listY, contentW, listH, 26);
   ctx.stroke();
+  ctx.fillStyle = 'rgba(0,245,160,0.02)';
+  rr(ctx, contentX, listY, contentW, listH, 26);
+  ctx.fill();
 
-  // divisor
-  ctx.strokeStyle = 'rgba(0,245,160,0.15)';
-  ctx.beginPath();
-  ctx.moveTo(PAD, headerH-8);
-  ctx.lineTo(W-PAD, headerH-8);
-  ctx.stroke();
+  // marcar un único capitán: el primer jugador "pro" de la lista
+  let captainMarked = false;
+  const rowsX = contentX + listPad;
 
-  // filas
   if(items.length===0){
     ctx.fillStyle = '#8892A6';
-    ctx.font = '600 16px Arial';
-    ctx.fillText('Todavía no hay jugadores convocados', W/2, headerH + rowH/2 + 6);
+    ctx.font = '600 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Todavía no hay jugadores convocados', W/2, listY + listH/2 + 6);
   } else {
+    const nameFont = numCols===2 ? '800 19px Arial' : '800 24px Arial';
+    const badgeR = numCols===2 ? 18 : 21;
+
     items.forEach((p,i)=>{
-      const y = headerH + i*rowH;
-      if(i%2===0){
-        ctx.fillStyle = 'rgba(0,245,160,0.035)';
-        ctx.fillRect(PAD-6, y+2, W-2*(PAD-6), rowH-8);
-      }
-      // numero
-      ctx.textAlign = 'right';
+      const isCaptain = p.isPro && !captainMarked ? (captainMarked = true, true) : false;
+      const col = Math.floor(i / rowsPerCol);
+      const rowInCol = i % rowsPerCol;
+      const rx = rowsX + col*(colW+colGap);
+      const rw = colW;
+      const ry = listY + listPad + rowInCol*(rowH+rowGap);
+
+      // fondo de la fila
+      ctx.fillStyle = '#182238';
+      rr(ctx, rx, ry, rw, rowH, 16);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,245,160,0.12)';
+      ctx.lineWidth = 1;
+      rr(ctx, rx, ry, rw, rowH, 16);
+      ctx.stroke();
+
+      const cy = ry + rowH/2;
+
+      // badge circular con el número (reemplaza el balón+número superpuestos)
+      const bx = rx + 16 + badgeR;
+      ctx.beginPath();
+      ctx.arc(bx, cy, badgeR, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(0,245,160,0.10)';
+      ctx.fill();
+      ctx.strokeStyle = '#00F5A0';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
       ctx.fillStyle = '#00F5A0';
-      ctx.font = '700 17px monospace';
-      ctx.fillText(`${i+1}.`, PAD+38, y+rowH/2+6);
+      ctx.font = numCols===2 ? "400 18px 'Anton', Arial" : "400 22px 'Anton', Arial";
+      ctx.textAlign = 'center';
+      ctx.fillText(`${i+1}`, bx, cy + (numCols===2?6:7));
+
       // nombre
       ctx.textAlign = 'left';
+      let nameX = rx + 16 + badgeR*2 + 12;
       ctx.fillStyle = '#F3F6FA';
-      ctx.font = '700 20px Arial';
-      ctx.fillText(`${p.isGK?'🥅':(p.isPro?'🥇🏆':'⚽')}  ${p.name}`, PAD+52, y+rowH/2+7);
-      // check de llegada (si aplica)
-      if(p.arrived){
+      ctx.font = nameFont;
+      const gkTag = p.isGK ? '🥅 ' : '';
+      const availW = rx + rw - nameX - 14;
+      let label = `${gkTag}${p.name}`;
+      // recorta el nombre si no cabe (sobre todo en 2 columnas)
+      while(ctx.measureText(label).width > availW && label.length > 4){
+        label = label.slice(0, -2);
+      }
+      if(label !== `${gkTag}${p.name}`) label = label.trim() + '…';
+      ctx.fillText(label, nameX, cy+7);
+
+      if(isCaptain){
+        // estrella dorada pequeña bajo el nombre en vez de píldora ancha (cabe en ambas columnas)
+        ctx.font = numCols===2 ? '600 11px Arial' : '700 13px Arial';
+        ctx.fillStyle = '#FFC107';
+        ctx.fillText('★ CAPITÁN', nameX, cy + (numCols===2?20:22));
+      } else if(p.arrived){
         ctx.textAlign = 'right';
         ctx.fillStyle = '#00F5A0';
         ctx.font = '700 16px Arial';
-        ctx.fillText('✓', W-PAD, y+rowH/2+6);
+        ctx.fillText('✓', rx+rw-14, cy+6);
+        ctx.textAlign = 'left';
       }
     });
   }
 
-  // footer
+  y = listY + listH + 28;
+
+  // ---------- footer con píldora ----------
+  ctx.font = '700 12px monospace';
+  const footerTxt = (meta.footer || 'FÚTBOL · LISTA DE CONVOCADOS').toUpperCase();
+  const footerFullTxt = `⚽ ${footerTxt}`;
+  const footerTxtW = ctx.measureText(footerFullTxt).width;
+  const fPillPad = 20, fPillH = 34;
+  const fPillW = footerTxtW + fPillPad*2;
+  const fPillX = W/2 - fPillW/2;
+  const fPillY = y;
+  ctx.strokeStyle = 'rgba(0,245,160,0.4)';
+  ctx.lineWidth = 1.3;
+  rr(ctx, fPillX, fPillY, fPillW, fPillH, fPillH/2);
+  ctx.stroke();
+  ctx.fillStyle = '#8fa0b8';
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#5b6577';
-  ctx.font = '700 11px monospace';
-  ctx.fillText('⚽ FÚTBOL · LISTA DE CONVOCADOS', W/2, H-18);
+  ctx.fillText(footerFullTxt, W/2, fPillY + fPillH/2 + 4);
 
   return canvas;
 }
@@ -1662,8 +1831,9 @@ function downloadConvocadosSabado(){
   const info = modeInfo();
   const items = convocadosItemsFromRows(w.rows);
   const canvas = buildConvocadosCanvas(items, {
-    title: '⚽ CONVOCADOS',
-    sub: `${fmtDateLong(w.date)} · ${fmtHora12(w.hora||info.defaultHora)} · ${w.lugar||info.defaultLugar}`
+    title: 'CONVOCADOS',
+    sub: `${fmtDateLong(w.date)} · ${fmtHora12(w.hora||info.defaultHora)} · ${w.lugar||info.defaultLugar}`,
+    footer: 'FÚTBOL · CONVOCATORIA SÁBADOS'
   });
   downloadCanvasAsImage(canvas, `convocados-${w.date}.png`);
 }
@@ -1675,8 +1845,9 @@ function downloadConvocadosCamp(){
   const c = activeCampeonato();
   const items = convocadosItemsFromRows(f.rows);
   const canvas = buildConvocadosCanvas(items, {
-    title: '🏆 CONVOCADOS',
-    sub: `${c?c.nombre+' · ':''}${fmtDateLong(f.date)} · ${fmtHora12(f.hora||info.defaultHora)} · ${f.lugar||info.defaultLugar}`
+    title: 'CONVOCADOS',
+    sub: `${c?c.nombre+' · ':''}${fmtDateLong(f.date)} · ${fmtHora12(f.hora||info.defaultHora)} · ${f.lugar||info.defaultLugar}`,
+    footer: 'SELECCIÓN · CONVOCATORIA 2026'
   });
   downloadCanvasAsImage(canvas, `convocados-${f.date}.png`);
 }
