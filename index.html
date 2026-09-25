@@ -85,6 +85,7 @@
   }
 
   .back-bar{ display:flex; align-items:center; gap:8px; margin-bottom:8px; min-height:32px; }
+  .valores-row-top{ flex:1; margin-bottom:0; min-width:0; }
 
   .home-option{
     display:flex; align-items:center; gap:14px;
@@ -122,6 +123,20 @@
   }
   .camp-selector-bar .csb-name{ font-weight:700; font-size:12.5px; color:var(--gold); }
   .camp-selector-bar .csb-chevron{ font-size:11px; color:var(--cyan); font-family:'JetBrains Mono'; }
+
+  .valores-row{display:flex; gap:8px; margin-bottom:8px;}
+  .valor-box{
+    flex:1; min-width:0; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:6px 9px;
+  }
+  .valor-box label{display:block; font-family:'JetBrains Mono'; font-size:9px; color:var(--chalk-dim); letter-spacing:0.6px; text-transform:uppercase; font-weight:700; margin-bottom:3px;}
+  .valor-input-wrap{display:flex; align-items:center; gap:2px;}
+  .valor-input-wrap .valor-prefix, .valor-input-wrap .valor-suffix{font-size:12px; color:var(--chalk-dim); font-weight:700;}
+  .valor-input-wrap input[type=number]{
+    background:transparent; border:none; color:var(--gold); font-family:'JetBrains Mono'; font-weight:700; font-size:14.5px;
+    padding:0; width:100%; min-width:0; border-radius:0;
+  }
+  .valor-input-wrap input[type=number]:focus{outline:none;}
+  .valor-derived{font-family:'JetBrains Mono'; font-size:9.5px; color:var(--cyan); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 
   .topline{display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:5px;}
   .mini-title{
@@ -249,6 +264,12 @@
   .stat-chip.win .sval{color:var(--cyan);}
   .stat-chip.warn .sval{color:var(--lose);}
 
+  /* Fila de resumen compacta (solo sábados) */
+  .stats-strip-sabado{ margin-bottom:6px; gap:4px; }
+  .stats-strip-sabado .stat-chip{ padding:3px 8px; min-width:52px; --cut:6px; }
+  .stats-strip-sabado .stat-chip .slabel{ font-size:7.5px; }
+  .stats-strip-sabado .stat-chip .sval{ font-size:11.5px; margin-top:0; }
+
   /* SPREADSHEET TABLE */
   .sheet-wrap{
     border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--surface);
@@ -323,6 +344,15 @@
   .vta-val.exacto{ color:var(--win); }
   .vta-val.pend{ color:var(--chalk-dim); }
 
+  /* Filas más compactas en la tabla de sábados (proporcionadas al encabezado "Nombre") */
+  .sabado-sheet table.sheet thead th{ padding:3.5px 3px; }
+  .sabado-sheet table.sheet td{ padding:1.5px 3px; }
+  .sabado-sheet .rownum{ font-size:8.5px; }
+  .sabado-sheet .rname{ font-size:10.5px; line-height:1.05; }
+  .sabado-sheet .cell-btn{ width:17px; height:17px; }
+  .sabado-sheet .dio-input{ padding:1px 3px; }
+  .sabado-sheet .pago-val, .sabado-sheet .vta-val{ font-size:8.5px; }
+
   .section-row td{
     background:#0f1626; color:var(--gold); font-family:'JetBrains Mono'; font-weight:700; font-size:9.5px;
     text-transform:uppercase; letter-spacing:1px; text-align:left; padding:4px 7px; border-bottom:1px solid var(--line);
@@ -374,8 +404,8 @@
 <script>
 const DOW = ["DOM","LUN","MAR","MIÉ","JUE","VIE","SÁB"];
 const MONTHS = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-const PRICE_WIN = 8000;
-const PRICE_LOSE = 12500;
+const DEFAULT_VALOR_CANCHA = 120000;
+const DEFAULT_VALOR_APOSTADO = 45000;
 
 const DEFAULT_ROSTER = [
   {name:"Daniel Taca", isGK:true},
@@ -553,6 +583,10 @@ function ensureWeekDefaults(w, modeKey){
   const info = MODE_INFO[modeKey] || MODE_INFO.sabado;
   if(!w.hora) w.hora = info.defaultHora;
   if(!w.lugar) w.lugar = info.defaultLugar;
+  if(modeKey==='sabado'){
+    if(w.valorCancha===undefined || w.valorCancha===null || isNaN(w.valorCancha)) w.valorCancha = DEFAULT_VALOR_CANCHA;
+    if(w.valorApostado===undefined || w.valorApostado===null || isNaN(w.valorApostado)) w.valorApostado = DEFAULT_VALOR_APOSTADO;
+  }
 }
 
 // Convierte cualquier formato (nuevo, viejo, o archivo importado) en un `state` válido.
@@ -680,11 +714,11 @@ function activeWeek(){
 }
 
 function makeRow(rp, opts={}){
-  return { rowId: uid(), playerId: rp.id, name: rp.name, isGK: !!rp.isGK, arrived: !!opts.arrived, won: true, dio:0, modo:'E', vueltoConfirmado:false };
+  return { rowId: uid(), playerId: rp.id, name: rp.name, isGK: !!rp.isGK, isPro: !!rp.isPro, arrived: !!opts.arrived, won: true, dio:0, modo:'E', vueltoConfirmado:false };
 }
 
 function newWeek(){
-  weeksArr().push({ id: uid(), date: todayISO(), phase: 'armando', rows: [], hora: modeInfo().defaultHora, lugar: modeInfo().defaultLugar });
+  weeksArr().push({ id: uid(), date: todayISO(), phase: 'armando', rows: [], hora: modeInfo().defaultHora, lugar: modeInfo().defaultLugar, valorCancha: DEFAULT_VALOR_CANCHA, valorApostado: DEFAULT_VALOR_APOSTADO });
   saveData(); render();
 }
 
@@ -866,14 +900,52 @@ function campTotals(){
 
 
 /* ---------- payment calc ---------- */
-function calcOwed(r){
-  if(!r.arrived) return null;
-  if(r.won===true) return PRICE_WIN;
-  if(r.won===false) return PRICE_LOSE;
-  return null;
+// Reparte "Valor Cancha" entre todos los que llegaron, y "Valor Apostado" solo entre los que perdieron.
+// Ambos valores son editables por el usuario (ver topline de renderSabado) y nunca son fijos en el código.
+function sabadoValores(w){
+  const rows = (w && w.rows) || [];
+  const arrivedCount = rows.filter(r=>r.arrived).length;
+  const normalArrivedCount = rows.filter(r=>r.arrived && !r.isGK && !r.isPro).length;
+  const losersCount = rows.filter(r=>r.arrived && r.won===false && !r.isGK).length;
+  const valorCancha = (w && w.valorCancha) || 0;
+  const valorApostado = (w && w.valorApostado) || 0;
+  const porJugador = normalArrivedCount>0 ? (valorCancha/normalArrivedCount) : 0;
+  const porPerdedor = losersCount>0 ? (valorApostado/losersCount) : 0;
+  return { porJugador, porPerdedor, arrivedCount, normalArrivedCount, losersCount, valorCancha, valorApostado };
 }
-function paymentStatus(r){
-  const owed = calcOwed(r);
+function valoresRowHtml(w, readOnly){
+  const vals = sabadoValores(w);
+  return `<div class="valores-row valores-row-top">
+    <div class="valor-box">
+      <label for="valorCanchaInput">Valor cancha</label>
+      <div class="valor-input-wrap">
+        <span class="valor-prefix">$</span>
+        <input type="number" min="0" step="1" id="valorCanchaInput" value="${fmtMiles(w.valorCancha)}" ${readOnly?'disabled':''}>
+        <span class="valor-suffix">k</span>
+      </div>
+      <div class="valor-derived">${vals.normalArrivedCount>0 ? `$${fmt(vals.porJugador)} c/u · ${vals.normalArrivedCount} normales` : 'Sin normales aún'}</div>
+    </div>
+    <div class="valor-box">
+      <label for="valorApostadoInput">Valor apostado</label>
+      <div class="valor-input-wrap">
+        <span class="valor-prefix">$</span>
+        <input type="number" min="0" step="1" id="valorApostadoInput" value="${fmtMiles(w.valorApostado)}" ${readOnly?'disabled':''}>
+        <span class="valor-suffix">k</span>
+      </div>
+      <div class="valor-derived">${vals.losersCount>0 ? `$${fmt(vals.porPerdedor)} c/u · ${vals.losersCount} perd.` : 'Sin perdedores aún'}</div>
+    </div>
+  </div>`;
+}
+function calcOwed(r, w){
+  if(!r.arrived) return null;
+  if(r.won!==true && r.won!==false) return null;
+  const vals = sabadoValores(w);
+  if(r.isGK) return 0; // arquero: no paga cancha ni apuesta
+  if(r.isPro) return r.won===true ? 0 : vals.porPerdedor; // pro: no paga cancha, sí apuesta si pierde
+  return r.won===true ? vals.porJugador : (vals.porJugador + vals.porPerdedor); // normal: cancha + apuesta si pierde
+}
+function paymentStatus(r, w){
+  const owed = calcOwed(r, w);
   if(owed===null) return {state:'sin-resultado', owed:0, dio:r.dio||0, delta:0};
   const dio = r.dio||0;
   if(dio<=0) return {state:'pendiente', owed, dio:0, delta:0};
@@ -881,16 +953,16 @@ function paymentStatus(r){
   if(dio>owed) return {state:'devolver', owed, dio, delta: dio-owed};
   return {state:'falta', owed, dio, delta: owed-dio};
 }
-function rowIsComplete(r){
+function rowIsComplete(r, w){
   if(!r.arrived) return false;
-  const st = paymentStatus(r);
+  const st = paymentStatus(r, w);
   if(st.state==='exacto') return true;
   if(st.state==='devolver') return !!r.vueltoConfirmado;
   return false;
 }
-function rowNeedsAction(r){
+function rowNeedsAction(r, w){
   if(!r.arrived) return false;
-  const st = paymentStatus(r);
+  const st = paymentStatus(r, w);
   if(st.state==='falta') return true;
   if(st.state==='devolver' && !r.vueltoConfirmado) return true;
   return false;
@@ -941,11 +1013,14 @@ function render(){
         <button data-camptab="historial" class="${campTab==='historial'?'active':''}"><span class="ico">📋</span>Historial</button>
         <button data-camptab="estadistica" class="${campTab==='estadistica'?'active':''}"><span class="ico">📊</span>Estadística</button>
       </div>`;
+  const sabadoActiveWeek = (mode==='sabado' && tab==='sabado') ? activeWeek() : null;
+  const backBarValoresHtml = sabadoActiveWeek ? valoresRowHtml(sabadoActiveWeek, !!historyViewId) : '';
   app.innerHTML = `
     <div class="wrap content" id="content">
       <div class="back-bar">
         ${navStack.length>0 ? `<button class="back-btn" id="globalBackBtn" title="Atrás" aria-label="Atrás">${BACK_ICON_SVG}</button>` : ''}
         <button class="back-btn" id="homeBtn" title="Inicio" aria-label="Inicio">🏠</button>
+        ${backBarValoresHtml}
       </div>
       ${mode==='semana' ? campeonatoSelectorBarHtml() : ''}
       <div id="modeContent"></div>
@@ -1192,8 +1267,6 @@ function renderSabado(){
 
   html += `<div class="topline">
     <div>
-      <div class="eyebrow">${fmtDateLong(w.date)}</div>
-      <div style="font-size:11px; color:var(--chalk-dim); margin-top:2px;">🕒 ${fmtHora12(w.hora||info.defaultHora)} · 📍 ${escapeHtml(w.lugar||info.defaultLugar)}</div>
       <span class="phase-chip phase-${w.phase}">${phaseLabel(w.phase)}</span>
     </div>
     <div class="mini-title">${info.titleHtml}</div>
@@ -1210,13 +1283,13 @@ function renderSabado(){
   if(w.phase==='jugando' && arrived.length>0){
     let recaudado=0, efectivo=0, nequi=0, pendientes=0;
     arrived.forEach(r=>{
-      const st = paymentStatus(r);
+      const st = paymentStatus(r, w);
       recaudado += Math.min(st.dio, st.owed);
       if(r.modo==='E') efectivo += Math.min(st.dio, st.owed);
       if(r.modo==='N') nequi += Math.min(st.dio, st.owed);
-      if(rowNeedsAction(r) || st.state==='pendiente' || st.state==='sin-resultado') pendientes++;
+      if(rowNeedsAction(r, w) || st.state==='pendiente' || st.state==='sin-resultado') pendientes++;
     });
-    html += `<div class="stats-strip">
+    html += `<div class="stats-strip stats-strip-sabado">
       <div class="stat-chip gold"><div class="slabel">Recaudado</div><div class="sval">$${fmt(recaudado)}</div></div>
       <div class="stat-chip"><div class="slabel">Llegaron</div><div class="sval">${arrived.length}/${w.rows.length}</div></div>
       <div class="stat-chip win"><div class="slabel">Efectivo</div><div class="sval">$${fmt(efectivo)}</div></div>
@@ -1249,12 +1322,13 @@ function sortByResult(rows){
 
 function renderSheet(w, cellsLocked, showAdd){
   const gkRows = sortByResult(w.rows.filter(r=>r.isGK));
-  const fieldRows = sortByResult(w.rows.filter(r=>!r.isGK));
+  const proRows = sortByResult(w.rows.filter(r=>!r.isGK && r.isPro));
+  const fieldRows = sortByResult(w.rows.filter(r=>!r.isGK && !r.isPro));
 
   function rowHtml(r, num, icon){
-    const st = paymentStatus(r);
-    const complete = rowIsComplete(r);
-    const needsAction = rowNeedsAction(r);
+    const st = paymentStatus(r, w);
+    const complete = rowIsComplete(r, w);
+    const needsAction = rowNeedsAction(r, w);
     let trClass = r.isGK ? 'row-gk' : '';
     if(complete) trClass += ' row-complete';
     else if(needsAction) trClass += ' row-action';
@@ -1282,7 +1356,7 @@ function renderSheet(w, cellsLocked, showAdd){
     </tr>`;
   }
 
-  let html = `<div class="sheet-wrap"><div class="sheet-scroll"><table class="sheet">
+  let html = `<div class="sheet-wrap sabado-sheet"><div class="sheet-scroll"><table class="sheet">
     <thead><tr>
       <th class="col-num sticky-col">#</th>
       <th class="col-name th-name sticky-col">Nombre</th>
@@ -1298,8 +1372,12 @@ function renderSheet(w, cellsLocked, showAdd){
   if(gkRows.length>0){
     gkRows.forEach((r,i)=> html += rowHtml(r, i+1, '🥅'));
   }
+  let jugadorConsecutivo = 0;
+  if(proRows.length>0){
+    proRows.forEach(r=> html += rowHtml(r, ++jugadorConsecutivo, '🥇🏆'));
+  }
   if(fieldRows.length>0){
-    fieldRows.forEach((r,i)=> html += rowHtml(r, i+1, '⚽🏃🏻'));
+    fieldRows.forEach(r=> html += rowHtml(r, ++jugadorConsecutivo, '⚽🏃🏻'));
   }
   if(w.rows.length===0){
     html += `<tr><td colspan="8" style="padding:18px; color:var(--chalk-dim); text-align:center;">Agrega jugadores abajo o desde "Plantel"</td></tr>`;
@@ -1311,7 +1389,11 @@ function renderSheet(w, cellsLocked, showAdd){
       <button class="btn btn-outline btn-xs" id="pickFromRosterBtn">👥 Desde plantel</button>
       <button class="btn btn-outline btn-xs" id="downloadConvocadosBtn" title="Descargar convocados como imagen">🖼️⬇️</button>
       <input type="text" id="quickAddInput" placeholder="Jugador nuevo...">
-      <label class="gk-check"><input type="checkbox" id="quickAddGK"> Arq.</label>
+      <select id="quickAddTag" class="btn btn-outline btn-xs">
+        <option value="normal">⚽🏃 Normal</option>
+        <option value="pro">🥇🏆 Pro</option>
+        <option value="gk">🥅 Arq.</option>
+      </select>
       <button class="btn btn-gold btn-xs" id="quickAddBtn">+</button>
     </div>`;
   }
@@ -1330,7 +1412,7 @@ function renderHistorial(){
     const d = fmtDateShort(w.date);
     const arrived = w.rows.filter(r=>r.arrived);
     let recaudado=0;
-    arrived.forEach(r=>{ const st=paymentStatus(r); recaudado += Math.min(st.dio, st.owed); });
+    arrived.forEach(r=>{ const st=paymentStatus(r, w); recaudado += Math.min(st.dio, st.owed); });
     html += `<div class="hist-item" data-view-week="${w.id}">
       <div class="hist-date">${d.num}<span class="dow">${d.mon}</span></div>
       <div class="hist-info">
@@ -1347,10 +1429,10 @@ function renderHistorial(){
 function pickerRowHtml(p, sel){
   return `<div class="roster-row" data-pick-name="${escapeAttr(normalizeSearch(p.name))}" data-pick="${p.id}" style="cursor:pointer;">
     <span style="width:22px;height:22px;border-radius:6px;border:2px solid ${sel?'var(--win)':'var(--chalk-dim)'};background:${sel?'var(--win)':'none'};color:#0a1f10;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex-shrink:0;">${sel?'✓':''}</span>
-    <span style="flex:1;font-weight:600;font-size:13.5px;">${p.isGK?'🥅 ':''}${escapeHtml(p.name)}</span>
+    <span style="flex:1;font-weight:600;font-size:13.5px;">${p.isGK?'🥅 ':(p.isPro?'🥇🏆 ':'')}${escapeHtml(p.name)}</span>
   </div>`;
 }
-function sortGkFirst(arr){ return [...arr.filter(p=>p.isGK), ...arr.filter(p=>!p.isGK)]; }
+function sortGkFirst(arr){ return [...arr.filter(p=>p.isGK), ...arr.filter(p=>!p.isGK && p.isPro), ...arr.filter(p=>!p.isGK && !p.isPro)]; }
 function weekPickerListHtml(w){
   const inWeek = new Set(w.rows.map(r=>r.playerId));
   const all = roster();
@@ -1385,7 +1467,7 @@ function rosterRowHtml(p, w){
   const inWeek = w && w.rows.some(r=>r.playerId===p.id);
   return `<div class="roster-row" data-roster-row-name="${escapeAttr(normalizeSearch(p.name))}">
     <input type="text" data-roster-name="${p.id}" value="${escapeAttr(p.name)}">
-    <button class="btn btn-xs ${p.isGK?'btn-gold':'btn-outline'}" data-roster-gk="${p.id}">${p.isGK?'🥅':'Arq.'}</button>
+    <button class="btn btn-xs ${p.isGK||p.isPro?'btn-gold':'btn-outline'}" data-roster-tag="${p.id}">${p.isGK?'🥅':(p.isPro?'🥇🏆':'Arq.')}</button>
     ${w ? `<button class="btn btn-xs ${inWeek?'btn-gold':'btn-outline'}" data-roster-convene="${p.id}">${inWeek?'✓ Hoy':'+ Hoy'}</button>` : ''}
     ${p.phone
       ? `<button class="btn btn-icon btn-wsp" data-roster-wsp="${p.id}" title="Enviar WhatsApp">💬</button>
@@ -1432,7 +1514,11 @@ function rosterEditorModal(){
     ${roster().length===0 ? `<p style="color:var(--chalk-dim); font-size:12px; padding:8px 0;">Todavía no hay jugadores en el plantel.</p>` : ''}
     <div class="add-strip" style="border:none; padding:10px 0 0; background:none;">
       <input type="text" id="rosterAddInput" placeholder="Nuevo jugador...">
-      <label class="gk-check"><input type="checkbox" id="rosterAddGK"> Arq.</label>
+      <select id="rosterAddTag" class="btn btn-outline btn-xs">
+        <option value="normal">⚽🏃 Normal</option>
+        <option value="pro">🥇🏆 Pro</option>
+        <option value="gk">🥅 Arq.</option>
+      </select>
       <button class="btn btn-gold btn-xs" id="rosterAddBtn">+</button>
     </div>
     <div class="modal-actions">
@@ -1528,7 +1614,7 @@ function buildConvocadosCanvas(items, meta){
       ctx.textAlign = 'left';
       ctx.fillStyle = '#F3F6FA';
       ctx.font = '700 20px Arial';
-      ctx.fillText(`${p.isGK?'🥅':'⚽'}  ${p.name}`, PAD+52, y+rowH/2+7);
+      ctx.fillText(`${p.isGK?'🥅':(p.isPro?'🥇🏆':'⚽')}  ${p.name}`, PAD+52, y+rowH/2+7);
       // check de llegada (si aplica)
       if(p.arrived){
         ctx.textAlign = 'right';
@@ -1565,8 +1651,9 @@ function downloadCanvasAsImage(canvas, filename){
 
 function convocadosItemsFromRows(rows){
   const gk = rows.filter(r=>r.isGK);
-  const field = rows.filter(r=>!r.isGK);
-  return [...gk, ...field].map(r=>({ name:r.name, isGK:r.isGK, arrived:!!r.arrived }));
+  const pro = rows.filter(r=>!r.isGK && r.isPro);
+  const field = rows.filter(r=>!r.isGK && !r.isPro);
+  return [...gk, ...pro, ...field].map(r=>({ name:r.name, isGK:r.isGK, isPro:r.isPro, arrived:!!r.arrived }));
 }
 
 function downloadConvocadosSabado(){
@@ -1601,6 +1688,22 @@ function wireEvents(){
 
   const newWeekBtn = q('#newWeekBtn');
   if(newWeekBtn) newWeekBtn.onclick = newWeek;
+
+  const valorCanchaInput = q('#valorCanchaInput');
+  if(valorCanchaInput) valorCanchaInput.onchange = ()=>{
+    const w = activeWeek();
+    if(!w) return;
+    w.valorCancha = Math.max(0, Math.round((parseFloat(valorCanchaInput.value)||0)*1000));
+    saveData(); render();
+  };
+
+  const valorApostadoInput = q('#valorApostadoInput');
+  if(valorApostadoInput) valorApostadoInput.onchange = ()=>{
+    const w = activeWeek();
+    if(!w) return;
+    w.valorApostado = Math.max(0, Math.round((parseFloat(valorApostadoInput.value)||0)*1000));
+    saveData(); render();
+  };
 
   const changeDateBtn = q('#changeDateBtn');
   if(changeDateBtn) changeDateBtn.onclick = ()=>{
@@ -1713,7 +1816,7 @@ function wireEvents(){
   if(finishGameBtn) finishGameBtn.onclick = ()=>{
     const w = getCurrentWeek();
     const arrived = w.rows.filter(r=>r.arrived);
-    const pendientes = arrived.filter(r=> rowNeedsAction(r) || paymentStatus(r).state==='pendiente' || paymentStatus(r).state==='sin-resultado').length;
+    const pendientes = arrived.filter(r=> rowNeedsAction(r, w) || paymentStatus(r, w).state==='pendiente' || paymentStatus(r, w).state==='sin-resultado').length;
     if(pendientes>0){
       openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
         <h3>¿Finalizar de todas formas?</h3>
@@ -1781,13 +1884,15 @@ function wireEvents(){
     const inp = q('#quickAddInput');
     const name = (inp.value||'').trim();
     if(!name) return;
-    const isGK = q('#quickAddGK').checked;
+    const tagVal = q('#quickAddTag').value;
+    const isGK = tagVal==='gk';
+    const isPro = tagVal==='pro';
     if(!canAddToWeek(w, isGK)){
       showToast(isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
       return;
     }
     let rp = roster().find(p=>p.name.toLowerCase()===name.toLowerCase());
-    if(!rp){ rp = {id:uid(), name, isGK}; roster().push(rp); }
+    if(!rp){ rp = {id:uid(), name, isGK, isPro}; roster().push(rp); }
     w.rows.push(makeRow(rp, {arrived:true}));
     saveData(); render();
     setTimeout(()=>{ const i=q('#quickAddInput'); if(i) i.focus(); }, 0);
@@ -1927,10 +2032,12 @@ function wireRosterModal(){
         saveData();
       };
     });
-    qa('[data-roster-gk]').forEach(btn=>{
+    qa('[data-roster-tag]').forEach(btn=>{
       btn.onclick = ()=>{
-        const p = roster().find(x=>x.id===btn.dataset.rosterGk);
-        p.isGK = !p.isGK;
+        const p = roster().find(x=>x.id===btn.dataset.rosterTag);
+        if(p.isGK){ p.isGK=false; p.isPro=false; }
+        else if(p.isPro){ p.isGK=true; p.isPro=false; }
+        else { p.isPro=true; }
         saveData();
         refreshList();
       };
@@ -2019,8 +2126,8 @@ function wireRosterModal(){
     const inp = q('#rosterAddInput');
     const name = (inp.value||'').trim();
     if(!name) return;
-    const isGK = q('#rosterAddGK').checked;
-    roster().push({id:uid(), name, isGK});
+    const tagVal = q('#rosterAddTag').value;
+    roster().push({id:uid(), name, isGK: tagVal==='gk', isPro: tagVal==='pro'});
     saveData();
     closeModal();
     openModal(rosterEditorModal());
