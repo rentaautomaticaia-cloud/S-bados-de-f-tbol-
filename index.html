@@ -1589,6 +1589,33 @@ function drawGhostBall(ctx, cx, cy, r, color){
   ctx.restore();
 }
 
+// Reordena los items para que, si hay 2 o más arqueros, quede uno como
+// primer jugador de cada columna (en vez de los dos juntos en la misma columna).
+function arrangeForColumns(items, numCols){
+  if(numCols<2) return items.slice();
+  const n = items.length;
+  const gks = items.filter(p=>p.isGK);
+  if(gks.length<2) return items.slice();
+
+  const rest = items.filter(p=>!p.isGK);
+  const rowsPerCol = Math.ceil(n/numCols);
+  const result = new Array(n).fill(null);
+
+  let gi = 0;
+  for(let c=0; c<numCols && gi<gks.length; c++){
+    const pos = c*rowsPerCol;
+    if(pos<n){ result[pos] = gks[gi]; gi++; }
+  }
+  // arqueros extra (más de uno por columna) se agregan al resto, al inicio
+  while(gi<gks.length){ rest.unshift(gks[gi]); gi++; }
+
+  let ri = 0;
+  for(let idx=0; idx<n; idx++){
+    if(result[idx]===null){ result[idx] = rest[ri++]; }
+  }
+  return result;
+}
+
 function buildConvocadosCanvas(items, meta){
   const W = 760;
   const OUTER = 22;          // margen exterior del marco (para el glow)
@@ -1596,15 +1623,18 @@ function buildConvocadosCanvas(items, meta){
   const contentX = OUTER + FRAME_PAD;
   const contentW = W - 2*contentX;
 
-  // Con muchos convocados usamos 2 columnas simétricas para no alargar la imagen
-  const numCols = items.length > 10 ? 2 : 1;
+  // Siempre 2 columnas simétricas (si hay más de 1 convocado) para no alargar la imagen
+  const numCols = items.length > 1 ? 2 : 1;
   const colGap = 16;
-  const colW = (contentW - (numCols-1)*colGap) / numCols;
+  const listPad = 16;
+  const rowsW = contentW - 2*listPad;               // ancho real disponible dentro del marco de la lista
+  const colW = (rowsW - (numCols-1)*colGap) / numCols;
   const rowsPerCol = Math.max(1, Math.ceil(items.length / numCols));
+
+  const arranged = arrangeForColumns(items, numCols);
 
   const rowH = numCols===2 ? 58 : 68;
   const rowGap = numCols===2 ? 10 : 12;
-  const listPad = 16;
   const listItemsH = items.length>0 ? rowsPerCol*rowH + (rowsPerCol-1)*rowGap : rowH;
 
   const headerH = 232;       // pelota + título + subtítulo + contador
@@ -1718,7 +1748,7 @@ function buildConvocadosCanvas(items, meta){
     const nameFont = numCols===2 ? '800 19px Arial' : '800 24px Arial';
     const badgeR = numCols===2 ? 18 : 21;
 
-    items.forEach((p,i)=>{
+    arranged.forEach((p,i)=>{
       const isCaptain = p.isPro && !captainMarked ? (captainMarked = true, true) : false;
       const col = Math.floor(i / rowsPerCol);
       const rowInCol = i % rowsPerCol;
@@ -1757,7 +1787,10 @@ function buildConvocadosCanvas(items, meta){
       ctx.fillStyle = '#F3F6FA';
       ctx.font = nameFont;
       const gkTag = p.isGK ? '🥅 ' : '';
-      const availW = rx + rw - nameX - 14;
+      let rightReserve = 14;
+      if(isCaptain) rightReserve += 26;      // deja espacio para la estrella
+      else if(p.arrived) rightReserve += 22; // deja espacio para el check
+      const availW = rx + rw - nameX - rightReserve;
       let label = `${gkTag}${p.name}`;
       // recorta el nombre si no cabe (sobre todo en 2 columnas)
       while(ctx.measureText(label).width > availW && label.length > 4){
@@ -1767,10 +1800,12 @@ function buildConvocadosCanvas(items, meta){
       ctx.fillText(label, nameX, cy+7);
 
       if(isCaptain){
-        // estrella dorada pequeña bajo el nombre en vez de píldora ancha (cabe en ambas columnas)
-        ctx.font = numCols===2 ? '600 11px Arial' : '700 13px Arial';
+        // solo una estrella dorada, sin la palabra "CAPITÁN"
+        ctx.textAlign = 'right';
         ctx.fillStyle = '#FFC107';
-        ctx.fillText('★ CAPITÁN', nameX, cy + (numCols===2?20:22));
+        ctx.font = numCols===2 ? '20px Arial' : '22px Arial';
+        ctx.fillText('★', rx+rw-14, cy+7);
+        ctx.textAlign = 'left';
       } else if(p.arrived){
         ctx.textAlign = 'right';
         ctx.fillStyle = '#00F5A0';
