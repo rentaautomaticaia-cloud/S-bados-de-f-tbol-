@@ -314,6 +314,9 @@
   tr.row-action .sticky-col{ background:#2b230f; }
   tr.row-action td{ background: rgba(255,193,7,0.06); }
 
+  tr.dragging{ position:relative; z-index:20; background:#1d2c4a !important; box-shadow:0 4px 14px rgba(0,0,0,.6); opacity:.95; }
+  tr.drop-target td{ border-top:2px solid var(--gold,#00f5a0) !important; }
+  tr.row-empty td{ height:28px; }
   .rownum{ font-family:'JetBrains Mono'; font-size:9px; color:var(--chalk-dim); }
   .gk-tag{ font-size:12px; }
   .rname{ font-weight:600; font-size:11px; line-height:1.2; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:116px; }
@@ -1344,7 +1347,7 @@ function renderSheet(w, cellsLocked, showAdd){
       else vtaHtml = `<span class="vta-val devolver" data-toggle-vuelto="${r.rowId}">+${fmtK(st.delta)}</span>`;
     }
 
-    return `<tr class="${trClass}">
+    return `<tr class="${trClass}" data-row="${r.rowId}">
       <td class="col-num sticky-col"><span class="rownum">${num}.</span></td>
       <td class="col-name sticky-col"><span class="rname">${icon} ${escapeHtml(r.name)}</span></td>
       <td class="col-ll"><button class="cell-btn ${r.arrived?'ll-on':''}" data-toggle-arrived="${r.rowId}" ${cellsLocked?'disabled':''}>${r.arrived?'✓':''}</button></td>
@@ -1369,9 +1372,11 @@ function renderSheet(w, cellsLocked, showAdd){
     </tr></thead>
     <tbody>`;
 
-  if(gkRows.length>0){
-    gkRows.forEach((r,i)=> html += rowHtml(r, i+1, '🥅'));
+  function emptyRow(num, label){
+    return `<tr class="row-empty"><td class="col-num sticky-col"><span class="rownum">${num}.</span></td><td class="col-name sticky-col"><span class="rname" style="opacity:.4;font-style:italic;">${label}</span></td><td colspan="6" style="opacity:.25;">&nbsp;</td></tr>`;
   }
+  gkRows.forEach((r,i)=> html += rowHtml(r, i+1, '🥅'));
+  for(let i=gkRows.length;i<MAX_GK;i++) html += emptyRow(i+1, '🥅 Arquero libre');
   let jugadorConsecutivo = 0;
   if(proRows.length>0){
     proRows.forEach(r=> html += rowHtml(r, ++jugadorConsecutivo, '🥇🏆'));
@@ -1379,9 +1384,7 @@ function renderSheet(w, cellsLocked, showAdd){
   if(fieldRows.length>0){
     fieldRows.forEach(r=> html += rowHtml(r, ++jugadorConsecutivo, '⚽🏃🏻'));
   }
-  if(w.rows.length===0){
-    html += `<tr><td colspan="8" style="padding:18px; color:var(--chalk-dim); text-align:center;">Agrega jugadores abajo o desde "Plantel"</td></tr>`;
-  }
+  for(let i=jugadorConsecutivo;i<MAX_FIELD;i++) html += emptyRow(i+1, 'Libre');
 
   html += `</tbody></table></div>`;
   if(showAdd){
@@ -2038,6 +2041,55 @@ function wireEvents(){
   };
 
   // sheet interactions
+  (function setupDrag(){
+    const w0 = getCurrentWeek();
+    if(!w0 || historyViewId) return;
+    const grpOf = r=> w=>w.rows.filter(x=>r.isGK ? x.isGK : (!x.isGK && !!x.isPro===!!r.isPro));
+    qa('tr[data-row] td.col-name').forEach(td=>{
+      const tr = td.parentElement;
+      let timer=null, drag=false, sx=0, sy=0, over=null;
+      const clear=()=>{ clearTimeout(timer); timer=null; };
+      const start=(x,y)=>{ sx=x; sy=y; drag=false; clear(); timer=setTimeout(()=>{ drag=true; tr.classList.add('dragging'); if(navigator.vibrate) navigator.vibrate(30); },350); };
+      const move=(x,y,e)=>{
+        if(!drag){ if(Math.abs(x-sx)>8||Math.abs(y-sy)>8) clear(); return; }
+        if(e.cancelable) e.preventDefault();
+        tr.style.transform=`translateY(${y-sy}px)`;
+        tr.style.pointerEvents='none';
+        const el=document.elementFromPoint(x,y);
+        const t=el&&el.closest('tr[data-row]');
+        if(over) over.classList.remove('drop-target');
+        over=(t&&t!==tr)?t:null;
+        if(over) over.classList.add('drop-target');
+      };
+      const end=()=>{
+        clear();
+        if(!drag) return;
+        drag=false;
+        tr.classList.remove('dragging'); tr.style.transform=''; tr.style.pointerEvents='';
+        if(over){
+          const w=getCurrentWeek();
+          const a=w.rows.find(r=>r.rowId===tr.dataset.row), b=w.rows.find(r=>r.rowId===over.dataset.row);
+          if(a&&b&&a.isGK===b.isGK&&!!a.isPro===!!b.isPro){
+            const ia=w.rows.indexOf(a); w.rows.splice(ia,1);
+            w.rows.splice(w.rows.indexOf(b)+(ia<w.rows.indexOf(b)+1?1:0),0,a);
+            saveData();
+          } else if(a&&b) showToast('Solo puedes mover dentro del mismo grupo');
+        }
+        render();
+      };
+      td.addEventListener('touchstart',e=>start(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
+      td.addEventListener('touchmove',e=>move(e.touches[0].clientX,e.touches[0].clientY,e),{passive:false});
+      td.addEventListener('touchend',end);
+      td.addEventListener('touchcancel',end);
+      td.addEventListener('mousedown',e=>{
+        start(e.clientX,e.clientY);
+        const mm=ev=>move(ev.clientX,ev.clientY,ev);
+        const mu=()=>{ document.removeEventListener('mousemove',mm); document.removeEventListener('mouseup',mu); end(); };
+        document.addEventListener('mousemove',mm); document.addEventListener('mouseup',mu);
+      });
+      td.addEventListener('contextmenu',e=>{ if(drag||timer) e.preventDefault(); });
+    });
+  })();
   qa('[data-toggle-arrived]').forEach(btn=>{
     btn.onclick = ()=>{
       const w = getCurrentWeek();
