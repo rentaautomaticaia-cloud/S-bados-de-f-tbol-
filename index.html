@@ -136,6 +136,12 @@
     padding:0; width:100%; min-width:0; border-radius:0;
   }
   .valor-input-wrap input[type=number]:focus{outline:none;}
+  /* Selector de modo de pago (Sábados) */
+  .modo-pago{display:flex; gap:6px; margin-bottom:6px;}
+  .modo-pago button{flex:1; padding:5px 6px; font-family:'JetBrains Mono'; font-size:9.5px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase; color:var(--chalk-dim); background:transparent; border:1px solid var(--chalk-dim); border-radius:6px; cursor:pointer;}
+  .modo-pago button.active{color:var(--gold); border-color:var(--gold); background:rgba(255,255,255,0.06);}
+  .modo-pago button:disabled{opacity:0.6; cursor:default;}
+  .modo-pago-hint{font-family:'JetBrains Mono'; font-size:9px; color:var(--cyan); margin-bottom:8px;}
   .valor-derived{font-family:'JetBrains Mono'; font-size:9.5px; color:var(--cyan); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 
   .topline{display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:5px;}
@@ -589,6 +595,7 @@ function ensureWeekDefaults(w, modeKey){
   if(modeKey==='sabado'){
     if(w.valorCancha===undefined || w.valorCancha===null || isNaN(w.valorCancha)) w.valorCancha = DEFAULT_VALOR_CANCHA;
     if(w.valorApostado===undefined || w.valorApostado===null || isNaN(w.valorApostado)) w.valorApostado = DEFAULT_VALOR_APOSTADO;
+    if(!MODOS_PAGO[w.modoPago]) w.modoPago = DEFAULT_MODO_PAGO; // partidos viejos quedan como 'dividido' (nada cambia)
   }
 }
 
@@ -720,8 +727,14 @@ function makeRow(rp, opts={}){
   return { rowId: uid(), playerId: rp.id, name: rp.name, isGK: !!rp.isGK, isPro: !!rp.isPro, arrived: !!opts.arrived, won: true, dio:0, modo:'E', vueltoConfirmado:false };
 }
 
+function lastModoPago(){
+  const arr = weeksArr();
+  const last = arr.length ? arr[arr.length-1] : null;
+  return (last && MODOS_PAGO[last.modoPago]) ? last.modoPago : DEFAULT_MODO_PAGO;
+}
+
 function newWeek(){
-  weeksArr().push({ id: uid(), date: todayISO(), phase: 'armando', rows: [], hora: modeInfo().defaultHora, lugar: modeInfo().defaultLugar, valorCancha: DEFAULT_VALOR_CANCHA, valorApostado: DEFAULT_VALOR_APOSTADO });
+  weeksArr().push({ id: uid(), date: todayISO(), phase: 'armando', rows: [], hora: modeInfo().defaultHora, lugar: modeInfo().defaultLugar, valorCancha: DEFAULT_VALOR_CANCHA, valorApostado: DEFAULT_VALOR_APOSTADO, modoPago: lastModoPago() });
   saveData(); render();
 }
 
@@ -903,8 +916,43 @@ function campTotals(){
 
 
 /* ---------- payment calc ---------- */
-// Reparte "Valor Cancha" entre todos los que llegaron, y "Valor Apostado" solo entre los que perdieron.
-// Ambos valores son editables por el usuario (ver topline de renderSabado) y nunca son fijos en el código.
+/* ===== MODOS DE PAGO (Sábados) =====
+   Cada modo define SOLO dos cosas:
+     1) cuotas(v): cuánto vale la cuota "por jugador" y la cuota "por perdedor".
+     2) debe(r, c): cuánto debe una fila concreta (r) dada esas cuotas (c).
+   Reglas comunes a todos los modos: el arquero nunca paga; si no llegó o no tiene resultado, no se calcula.
+   Para agregar un modo nuevo basta con sumar una entrada aquí (y nada más). */
+const DEFAULT_MODO_PAGO = 'dividido';
+const MODOS_PAGO = {
+  // Modo 1 (el de siempre): cancha entre todos los normales; apuesta solo entre perdedores.
+  dividido: {
+    label: 'Dividido',
+    hint: 'Cancha entre todos · Apuesta solo entre perdedores',
+    cuotas: v => ({
+      porJugador:  v.normalArrivedCount>0 ? v.valorCancha/v.normalArrivedCount : 0,
+      porPerdedor: v.losersCount>0 ? v.valorApostado/v.losersCount : 0
+    }),
+    debe: (r, c) => {
+      if(r.isPro) return r.won===true ? 0 : c.porPerdedor;   // pro: no paga cancha, sí apuesta si pierde
+      return r.won===true ? c.porJugador : (c.porJugador + c.porPerdedor); // normal
+    },
+    derivadoCancha:  v => v.normalArrivedCount>0 ? `$${fmt(v.porJugador)} c/u · ${v.normalArrivedCount} normales` : 'Sin normales aún',
+    derivadoApuesta: v => v.losersCount>0 ? `$${fmt(v.porPerdedor)} c/u · ${v.losersCount} perd.` : 'Sin perdedores aún'
+  },
+  // Modo 2: se apuesta todo (cancha + apuesta). Solo los perdedores pagan el total entre todos ellos.
+  perdedores: {
+    label: 'Perdedores pagan todo',
+    hint: 'Cancha + Apuesta se reparten solo entre los perdedores · Ganadores no pagan',
+    cuotas: v => ({
+      porJugador:  0,
+      porPerdedor: v.losersCount>0 ? (v.valorCancha + v.valorApostado)/v.losersCount : 0
+    }),
+    debe: (r, c) => r.won===true ? 0 : c.porPerdedor,        // ganadores 0; perdedores (incluido pro) cuota completa
+    derivadoCancha:  v => 'La pagan los perdedores',
+    derivadoApuesta: v => v.losersCount>0 ? `$${fmt(v.porPerdedor)} c/u · ${v.losersCount} perd. (total)` : 'Sin perdedores: nadie paga'
+  }
+};
+
 function sabadoValores(w){
   const rows = (w && w.rows) || [];
   const arrivedCount = rows.filter(r=>r.arrived).length;
@@ -912,12 +960,19 @@ function sabadoValores(w){
   const losersCount = rows.filter(r=>r.arrived && r.won===false && !r.isGK).length;
   const valorCancha = (w && w.valorCancha) || 0;
   const valorApostado = (w && w.valorApostado) || 0;
-  const porJugador = normalArrivedCount>0 ? (valorCancha/normalArrivedCount) : 0;
-  const porPerdedor = losersCount>0 ? (valorApostado/losersCount) : 0;
-  return { porJugador, porPerdedor, arrivedCount, normalArrivedCount, losersCount, valorCancha, valorApostado };
+  const modoKey = (w && MODOS_PAGO[w.modoPago]) ? w.modoPago : DEFAULT_MODO_PAGO;
+  const base = { arrivedCount, normalArrivedCount, losersCount, valorCancha, valorApostado, modoKey };
+  return { ...base, ...MODOS_PAGO[modoKey].cuotas(base) }; // agrega porJugador y porPerdedor según el modo
+}
+function modoPagoHtml(w, readOnly){
+  const actual = sabadoValores(w).modoKey;
+  const btns = Object.entries(MODOS_PAGO).map(([k,m])=>
+    `<button data-modo-pago="${k}" class="${k===actual?'active':''}" ${readOnly?'disabled':''}>${m.label}</button>`).join('');
+  return `<div class="modo-pago">${btns}</div><div class="modo-pago-hint">${MODOS_PAGO[actual].hint}</div>`;
 }
 function valoresRowHtml(w, readOnly){
   const vals = sabadoValores(w);
+  const modo = MODOS_PAGO[vals.modoKey];
   return `<div class="valores-row valores-row-top">
     <div class="valor-box">
       <label for="valorCanchaInput">Valor cancha</label>
@@ -926,7 +981,7 @@ function valoresRowHtml(w, readOnly){
         <input type="number" min="0" step="1" id="valorCanchaInput" value="${fmtMiles(w.valorCancha)}" ${readOnly?'disabled':''}>
         <span class="valor-suffix">k</span>
       </div>
-      <div class="valor-derived">${vals.normalArrivedCount>0 ? `$${fmt(vals.porJugador)} c/u · ${vals.normalArrivedCount} normales` : 'Sin normales aún'}</div>
+      <div class="valor-derived">${modo.derivadoCancha(vals)}</div>
     </div>
     <div class="valor-box">
       <label for="valorApostadoInput">Valor apostado</label>
@@ -935,17 +990,27 @@ function valoresRowHtml(w, readOnly){
         <input type="number" min="0" step="1" id="valorApostadoInput" value="${fmtMiles(w.valorApostado)}" ${readOnly?'disabled':''}>
         <span class="valor-suffix">k</span>
       </div>
-      <div class="valor-derived">${vals.losersCount>0 ? `$${fmt(vals.porPerdedor)} c/u · ${vals.losersCount} perd.` : 'Sin perdedores aún'}</div>
+      <div class="valor-derived">${modo.derivadoApuesta(vals)}</div>
     </div>
   </div>`;
 }
 function calcOwed(r, w){
   if(!r.arrived) return null;
   if(r.won!==true && r.won!==false) return null;
+  if(r.isGK) return 0; // arquero: no paga en ningún modo
   const vals = sabadoValores(w);
-  if(r.isGK) return 0; // arquero: no paga cancha ni apuesta
-  if(r.isPro) return r.won===true ? 0 : vals.porPerdedor; // pro: no paga cancha, sí apuesta si pierde
-  return r.won===true ? vals.porJugador : (vals.porJugador + vals.porPerdedor); // normal: cancha + apuesta si pierde
+  return MODOS_PAGO[vals.modoKey].debe(r, vals);
+}
+// Recaudo Bruto = todo lo que realmente quedó en mano: lo cobrado + los sobrantes que NO se devolvieron.
+// (Si el vuelto se marca como entregado, ese excedente deja de contar.)
+function recaudoBruto(w){
+  let total = 0;
+  ((w && w.rows) || []).filter(r=>r.arrived).forEach(r=>{
+    const st = paymentStatus(r, w);
+    total += Math.min(st.dio, st.owed);
+    if(st.state==='devolver' && !r.vueltoConfirmado) total += st.delta;
+  });
+  return total;
 }
 function paymentStatus(r, w){
   const owed = calcOwed(r, w);
@@ -1278,6 +1343,7 @@ function renderSabado(){
       ${!readOnly ? `<button class="btn btn-outline btn-xs" id="editRosterBtn">✎ Plantel</button>` : ''}
     </div>
   </div>`;
+  html += modoPagoHtml(w, readOnly);
 
   const cellsLocked = w.phase !== 'jugando';
   const showAdd = !readOnly;
@@ -1294,6 +1360,7 @@ function renderSabado(){
     });
     html += `<div class="stats-strip stats-strip-sabado">
       <div class="stat-chip gold"><div class="slabel">Recaudado</div><div class="sval">$${fmt(recaudado)}</div></div>
+      <div class="stat-chip gold"><div class="slabel">Recaudo Bruto</div><div class="sval">$${fmt(recaudoBruto(w))}</div></div>
       <div class="stat-chip"><div class="slabel">Llegaron</div><div class="sval">${arrived.length}/${w.rows.length}</div></div>
       <div class="stat-chip win"><div class="slabel">Efectivo</div><div class="sval">$${fmt(efectivo)}</div></div>
       <div class="stat-chip win"><div class="slabel">Nequi</div><div class="sval">$${fmt(nequi)}</div></div>
@@ -1420,7 +1487,7 @@ function renderHistorial(){
       <div class="hist-date">${d.num}<span class="dow">${d.mon}</span></div>
       <div class="hist-info">
         <div class="hmain">${arrived.length} jugadores</div>
-        <div class="hsub">Recaudado $${fmt(recaudado)}</div>
+        <div class="hsub">Recaudado $${fmt(recaudado)} · Bruto $${fmt(recaudoBruto(w))}</div>
       </div>
       <div class="stat-chip" style="min-width:auto;">${d.dow}</div>
       <button class="btn btn-xs btn-danger" data-delete-week="${w.id}" title="Eliminar">🗑</button>
@@ -1905,6 +1972,13 @@ function wireEvents(){
     w.valorCancha = Math.max(0, Math.round((parseFloat(valorCanchaInput.value)||0)*1000));
     saveData(); render();
   };
+
+  qa('[data-modo-pago]').forEach(b=>{ b.onclick = ()=>{
+    const w = activeWeek();
+    if(!w || !MODOS_PAGO[b.dataset.modoPago]) return;
+    w.modoPago = b.dataset.modoPago;
+    saveData(); render();
+  }; });
 
   const valorApostadoInput = q('#valorApostadoInput');
   if(valorApostadoInput) valorApostadoInput.onchange = ()=>{
