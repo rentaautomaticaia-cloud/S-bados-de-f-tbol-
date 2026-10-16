@@ -329,11 +329,10 @@
   tr.row-waitlist:hover td{ background:rgba(255,193,7,0.11); }
   tr.row-waitlist .rname{ color:#FFD54F; }
   tr.row-waitlist .rownum{ color:var(--amber); }
-  .wl-tag{ display:inline-block; margin-top:2px; font-family:'JetBrains Mono'; font-size:7.5px; font-weight:700; letter-spacing:0.4px; color:var(--amber); background:var(--amber-bg); border:1px solid rgba(255,193,7,0.45); border-radius:4px; padding:0 4px; white-space:nowrap; }
   tr.row-sep td, tr.row-sep:hover td{ padding:0; border-bottom:none; background:none; }
   .wl-sep{ display:flex; align-items:center; gap:6px; padding:6px 8px 4px; font-family:'JetBrains Mono'; font-size:9px; font-weight:700; letter-spacing:0.8px; color:var(--amber); text-transform:uppercase; text-shadow:0 0 10px rgba(255,193,7,0.35); }
   .wl-sep::before, .wl-sep::after{ content:''; flex:1; border-top:1px dashed rgba(255,193,7,0.5); }
-  tr[data-row] td.col-name{ user-select:none; -webkit-user-select:none; }
+  tr[data-row] td.col-name, tr[data-wait-row] td.col-name{ user-select:none; -webkit-user-select:none; }
   .rownum{ font-family:'JetBrains Mono'; font-size:9px; color:var(--chalk-dim); }
   .gk-tag{ font-size:12px; }
   .rname{ font-weight:600; font-size:11px; line-height:1.2; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:116px; }
@@ -1483,9 +1482,9 @@ function renderSheet(w, cellsLocked, showAdd){
   // Fila de jugador en espera: sin llegada, pago ni modo; solo informativa
   function waitRowHtml(r, num){
     const icon = r.isGK ? '🥅' : (r.isPro ? '🥇🏆' : '⚽🏃🏻');
-    return `<tr class="row-waitlist">
+    return `<tr class="row-waitlist" data-wait-row="${r.rowId}">
       <td class="col-num sticky-col"><span class="rownum">E${num}.</span></td>
-      <td class="col-name sticky-col"><span class="rname">${icon} ${escapeHtml(r.name)}</span><span class="wl-tag">🕒 EN ESPERA</span></td>
+      <td class="col-name sticky-col"><span class="rname">${icon} ${escapeHtml(r.name)}</span></td>
       <td class="col-ll"><button class="cell-btn" disabled></button></td>
       <td class="col-gp"><button class="cell-btn" disabled>—</button></td>
       <td class="col-pago"><span class="pago-val">—</span></td>
@@ -2265,6 +2264,22 @@ function wireEvents(){
           openDesconvocarModal(rowId);
         } else {
           lastNameTap = {rowId, t:now};
+        }
+      });
+    });
+  }
+  if(!historyViewId){
+    let lastWaitTap = {rowId:null, t:0};
+    qa('tr[data-wait-row] td.col-name').forEach(td=>{
+      td.addEventListener('click', ()=>{
+        if(Date.now()-lastDragEnd < 400) return;
+        const rowId = td.parentElement.dataset.waitRow;
+        const now = Date.now();
+        if(lastWaitTap.rowId===rowId && now-lastWaitTap.t < 400){
+          lastWaitTap = {rowId:null, t:0};
+          openQuitarEsperaModal(rowId);
+        } else {
+          lastWaitTap = {rowId, t:now};
         }
       });
     });
@@ -3747,6 +3762,26 @@ function openDesconvocarModal(rowId){
     const { promoted } = removeSabadoRow(w, rowId);
     saveData(); closeModal(); render();
     showToast(promoted.length ? `⬆ ${promoted[0].name} sube a convocados` : 'Jugador desconvocado');
+  };
+}
+
+function openQuitarEsperaModal(rowId){
+  const w = getCurrentWeek();
+  const r = w && w.rows.find(x=>x.rowId===rowId && x.waitlist);
+  if(!r) return;
+  openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>¿Quitar de la lista de espera a ${escapeHtml(r.name)}?</h3>
+    <p>No ocupa ningún cupo, así que no afecta a los convocados.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-block" id="cancelQuitarEsperaBtn">Cancelar</button>
+      <button class="btn btn-danger btn-block" id="confirmQuitarEsperaBtn">Quitar</button>
+    </div>
+  </div></div>`);
+  document.getElementById('cancelQuitarEsperaBtn').onclick = closeModal;
+  document.getElementById('confirmQuitarEsperaBtn').onclick = ()=>{
+    removeSabadoRow(w, rowId);
+    saveData(); closeModal(); render();
+    showToast('Quitado de la lista de espera');
   };
 }
 
