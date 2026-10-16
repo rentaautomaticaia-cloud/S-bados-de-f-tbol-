@@ -323,6 +323,17 @@
   tr.dragging{ position:relative; z-index:20; background:#1d2c4a !important; box-shadow:0 4px 14px rgba(0,0,0,.6); opacity:.95; }
   tr.drop-target td{ border-top:2px solid var(--gold,#00f5a0) !important; }
   tr.row-empty td{ height:28px; }
+  /* Lista de espera (Sábados) */
+  tr.row-waitlist td{ background:rgba(255,193,7,0.07); border-bottom-color:rgba(255,193,7,0.2); }
+  tr.row-waitlist .sticky-col{ background:#2b230f; }
+  tr.row-waitlist:hover td{ background:rgba(255,193,7,0.11); }
+  tr.row-waitlist .rname{ color:#FFD54F; }
+  tr.row-waitlist .rownum{ color:var(--amber); }
+  .wl-tag{ display:inline-block; margin-top:2px; font-family:'JetBrains Mono'; font-size:7.5px; font-weight:700; letter-spacing:0.4px; color:var(--amber); background:var(--amber-bg); border:1px solid rgba(255,193,7,0.45); border-radius:4px; padding:0 4px; white-space:nowrap; }
+  tr.row-sep td, tr.row-sep:hover td{ padding:0; border-bottom:none; background:none; }
+  .wl-sep{ display:flex; align-items:center; gap:6px; padding:6px 8px 4px; font-family:'JetBrains Mono'; font-size:9px; font-weight:700; letter-spacing:0.8px; color:var(--amber); text-transform:uppercase; text-shadow:0 0 10px rgba(255,193,7,0.35); }
+  .wl-sep::before, .wl-sep::after{ content:''; flex:1; border-top:1px dashed rgba(255,193,7,0.5); }
+  tr[data-row] td.col-name{ user-select:none; -webkit-user-select:none; }
   .rownum{ font-family:'JetBrains Mono'; font-size:9px; color:var(--chalk-dim); }
   .gk-tag{ font-size:12px; }
   .rname{ font-weight:600; font-size:11px; line-height:1.2; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:116px; }
@@ -511,11 +522,52 @@ function setWeeksArr(arr){ data().weeks = arr; }
 const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
 const MAX_GK = 2;
 const MAX_FIELD = 16;
-function countWeekGK(w, excludeRowId){ return w.rows.filter(r=>r.isGK && r.rowId!==excludeRowId).length; }
-function countWeekField(w, excludeRowId){ return w.rows.filter(r=>!r.isGK && r.rowId!==excludeRowId).length; }
+function countWeekGK(w, excludeRowId){ return w.rows.filter(r=>r.isGK && !r.waitlist && r.rowId!==excludeRowId).length; }
+function countWeekField(w, excludeRowId){ return w.rows.filter(r=>!r.isGK && !r.waitlist && r.rowId!==excludeRowId).length; }
 function canAddToWeek(w, isGK){
   if(!w) return true;
   return isGK ? countWeekGK(w) < MAX_GK : countWeekField(w) < MAX_FIELD;
+}
+
+/* ---------- LISTA DE ESPERA (Sábados) ----------
+   Un jugador en espera es una fila de w.rows con waitlist:true. Va siempre después de los
+   convocados y se mantiene en orden de inscripción (orden en el array). */
+function hasSpaceFor(w, isGK){ return isGK ? countWeekGK(w) < MAX_GK : countWeekField(w) < MAX_FIELD; }
+function firstWaitlistIdx(w){ const i = w.rows.findIndex(r=>r.waitlist); return i<0 ? w.rows.length : i; }
+// Agrega un jugador: convocado si hay cupo en su grupo; si no, queda en espera al final.
+function addPlayerToSabado(w, rp, opts={}){
+  const isGK = !!rp.isGK;
+  const wait = w.rows.some(r=>r.waitlist && r.isGK===isGK) || !hasSpaceFor(w, isGK);
+  const row = makeRow(rp, {arrived: !wait && !!opts.arrived});
+  row.waitlist = wait;
+  if(wait) w.rows.push(row);
+  else w.rows.splice(firstWaitlistIdx(w), 0, row);
+  return wait ? 'espera' : 'convocado';
+}
+// Sube a convocados a los primeros en espera mientras haya cupo. `at` = lugar que ocupa el convocado que se fue.
+function promoteWaitlist(w, at=null){
+  const promoted = [];
+  [true,false].forEach(isGK=>{
+    while(hasSpaceFor(w, isGK)){
+      const i = w.rows.findIndex(r=>r.waitlist && r.isGK===isGK);
+      if(i<0) break;
+      const [p] = w.rows.splice(i,1);
+      p.waitlist = false;
+      const pos = (at!==null && at<=w.rows.length) ? at : firstWaitlistIdx(w);
+      w.rows.splice(pos, 0, p);
+      promoted.push(p);
+      at = null;
+    }
+  });
+  return promoted;
+}
+// Quita una fila. Si era convocado, el primero de espera de su grupo ocupa su lugar.
+function removeSabadoRow(w, rowId){
+  const idx = w.rows.findIndex(r=>r.rowId===rowId);
+  if(idx<0) return { removed:null, promoted:[] };
+  const [removed] = w.rows.splice(idx,1);
+  const promoted = removed.waitlist ? [] : promoteWaitlist(w, idx);
+  return { removed, promoted };
 }
 
 const fmt = n => (Math.round(n||0)).toLocaleString('es-CO');
@@ -1347,6 +1399,7 @@ function renderSabado(){
 
   const cellsLocked = w.phase !== 'jugando';
   const showAdd = !readOnly;
+  if(!readOnly && w.rows.some(r=>r.waitlist) && promoteWaitlist(w).length) saveData();
   const arrived = w.rows.filter(r=>r.arrived);
 
   if(w.phase==='jugando' && arrived.length>0){
@@ -1361,7 +1414,7 @@ function renderSabado(){
     html += `<div class="stats-strip stats-strip-sabado">
       <div class="stat-chip gold"><div class="slabel">Recaudado</div><div class="sval">$${fmt(recaudado)}</div></div>
       <div class="stat-chip gold"><div class="slabel">Recaudo Bruto</div><div class="sval">$${fmt(recaudoBruto(w))}</div></div>
-      <div class="stat-chip"><div class="slabel">Llegaron</div><div class="sval">${arrived.length}/${w.rows.length}</div></div>
+      <div class="stat-chip"><div class="slabel">Llegaron</div><div class="sval">${arrived.length}/${w.rows.filter(r=>!r.waitlist).length}</div></div>
       <div class="stat-chip win"><div class="slabel">Efectivo</div><div class="sval">$${fmt(efectivo)}</div></div>
       <div class="stat-chip win"><div class="slabel">Nequi</div><div class="sval">$${fmt(nequi)}</div></div>
       <div class="stat-chip ${pendientes>0?'warn':''}"><div class="slabel">Pendientes</div><div class="sval">${pendientes}</div></div>
@@ -1391,9 +1444,10 @@ function sortByResult(rows){
 }
 
 function renderSheet(w, cellsLocked, showAdd){
-  const gkRows = sortByResult(w.rows.filter(r=>r.isGK));
-  const proRows = sortByResult(w.rows.filter(r=>!r.isGK && r.isPro));
-  const fieldRows = sortByResult(w.rows.filter(r=>!r.isGK && !r.isPro));
+  const gkRows = sortByResult(w.rows.filter(r=>r.isGK && !r.waitlist));
+  const proRows = sortByResult(w.rows.filter(r=>!r.isGK && r.isPro && !r.waitlist));
+  const fieldRows = sortByResult(w.rows.filter(r=>!r.isGK && !r.isPro && !r.waitlist));
+  const waitRows = w.rows.filter(r=>r.waitlist); // orden de inscripción
 
   function rowHtml(r, num, icon){
     const st = paymentStatus(r, w);
@@ -1426,6 +1480,21 @@ function renderSheet(w, cellsLocked, showAdd){
     </tr>`;
   }
 
+  // Fila de jugador en espera: sin llegada, pago ni modo; solo informativa
+  function waitRowHtml(r, num){
+    const icon = r.isGK ? '🥅' : (r.isPro ? '🥇🏆' : '⚽🏃🏻');
+    return `<tr class="row-waitlist">
+      <td class="col-num sticky-col"><span class="rownum">E${num}.</span></td>
+      <td class="col-name sticky-col"><span class="rname">${icon} ${escapeHtml(r.name)}</span><span class="wl-tag">🕒 EN ESPERA</span></td>
+      <td class="col-ll"><button class="cell-btn" disabled></button></td>
+      <td class="col-gp"><button class="cell-btn" disabled>—</button></td>
+      <td class="col-pago"><span class="pago-val">—</span></td>
+      <td class="col-dio"><input type="number" class="dio-input" disabled placeholder="0"></td>
+      <td class="col-vta"><span class="vta-val pend">—</span></td>
+      <td class="col-md"><button class="cell-btn" disabled>—</button></td>
+    </tr>`;
+  }
+
   let html = `<div class="sheet-wrap sabado-sheet"><div class="sheet-scroll"><table class="sheet">
     <thead><tr>
       <th class="col-num sticky-col">#</th>
@@ -1452,6 +1521,10 @@ function renderSheet(w, cellsLocked, showAdd){
     fieldRows.forEach(r=> html += rowHtml(r, ++jugadorConsecutivo, '⚽🏃🏻'));
   }
   for(let i=jugadorConsecutivo;i<MAX_FIELD;i++) html += emptyRow(i+1, 'Libre');
+  if(waitRows.length){
+    html += `<tr class="row-sep"><td colspan="8"><div class="wl-sep">🕒 LISTA DE ESPERA</div></td></tr>`;
+    waitRows.forEach((r,i)=> html += waitRowHtml(r, i+1));
+  }
 
   html += `</tbody></table></div>`;
   if(showAdd){
@@ -1506,15 +1579,22 @@ function sortGkFirst(arr){ return [...arr.filter(p=>p.isGK), ...arr.filter(p=>!p
 function weekPickerListHtml(w){
   const inWeek = new Set(w.rows.map(r=>r.playerId));
   const all = roster();
-  const selected = sortGkFirst(all.filter(p=>inWeek.has(p.id)));
+  const waitRows = w.rows.filter(r=>r.waitlist);
+  const waitIds = new Set(waitRows.map(r=>r.playerId));
+  const selected = sortGkFirst(all.filter(p=>inWeek.has(p.id) && !waitIds.has(p.id)));
+  const espera = waitRows.map(r=>all.find(p=>p.id===r.playerId)).filter(Boolean);
   const unselected = sortGkFirst(all.filter(p=>!inWeek.has(p.id)));
   let html = '';
   if(selected.length){
     html += `<div class="picker-group-label">✓ Convocados (${selected.length})</div>`;
     html += selected.map(p=>pickerRowHtml(p,true)).join('');
   }
+  if(espera.length){
+    html += `<div class="picker-group-label">🕒 En espera (${espera.length})</div>`;
+    html += espera.map(p=>pickerRowHtml(p,true)).join('');
+  }
   if(unselected.length){
-    if(selected.length) html += `<div class="picker-group-label">Plantel</div>`;
+    if(selected.length || espera.length) html += `<div class="picker-group-label">Plantel</div>`;
     html += unselected.map(p=>pickerRowHtml(p,false)).join('');
   }
   if(all.length===0) html += `<p>Tu plantel está vacío. Agrega jugadores desde "✎ Plantel".</p>`;
@@ -1553,12 +1633,18 @@ function rosterListHtml(w){
   if(all.length===0) return '';
   if(!w) return sortGkFirst(all).map(p=>rosterRowHtml(p, w)).join('');
   const inWeekIds = new Set(w.rows.map(r=>r.playerId));
-  const convocados = sortGkFirst(all.filter(p=>inWeekIds.has(p.id)));
+  const waitIds = new Set(w.rows.filter(r=>r.waitlist).map(r=>r.playerId));
+  const convocados = sortGkFirst(all.filter(p=>inWeekIds.has(p.id) && !waitIds.has(p.id)));
+  const espera = w.rows.filter(r=>r.waitlist).map(r=>all.find(p=>p.id===r.playerId)).filter(Boolean);
   const resto = sortGkFirst(all.filter(p=>!inWeekIds.has(p.id)));
   let html = '';
   if(convocados.length){
     html += `<div class="picker-group-label">✓ Convocados (${convocados.length})</div>`;
     html += convocados.map(p=>rosterRowHtml(p,w)).join('');
+  }
+  if(espera.length){
+    html += `<div class="picker-group-label">🕒 En espera (${espera.length})</div>`;
+    html += espera.map(p=>rosterRowHtml(p,w)).join('');
   }
   if(resto.length){
     if(convocados.length) html += `<div class="picker-group-label">Plantel</div>`;
@@ -1569,7 +1655,7 @@ function rosterListHtml(w){
 
 function rosterEditorModal(){
   const w = getCurrentWeek();
-  const convocados = w ? w.rows.map(r=>roster().find(p=>p.id===r.playerId)).filter(p=>p && p.phone) : [];
+  const convocados = w ? w.rows.filter(r=>!r.waitlist).map(r=>roster().find(p=>p.id===r.playerId)).filter(p=>p && p.phone) : [];
   let html = `<div class="modal-bg" id="modalBg"><div class="modal">
     <h3>Plantel · ${modeInfo().tabLabel}</h3>
     <p>${w ? 'Toca "+ Hoy" para convocar a alguien al partido activo.' : 'Crea un partido en la pestaña Partido para poder convocar desde aquí.'}</p>
@@ -1924,6 +2010,7 @@ function downloadCanvasAsImage(canvas, filename){
 }
 
 function convocadosItemsFromRows(rows){
+  rows = rows.filter(r=>!r.waitlist);
   const gk = rows.filter(r=>r.isGK);
   const pro = rows.filter(r=>!r.isGK && r.isPro);
   const field = rows.filter(r=>!r.isGK && !r.isPro);
@@ -2115,6 +2202,7 @@ function wireEvents(){
   };
 
   // sheet interactions
+  let lastDragEnd = 0;
   (function setupDrag(){
     const w0 = getCurrentWeek();
     if(!w0 || historyViewId) return;
@@ -2139,6 +2227,7 @@ function wireEvents(){
         clear();
         if(!drag) return;
         drag=false;
+        lastDragEnd = Date.now();
         tr.classList.remove('dragging'); tr.style.transform=''; tr.style.pointerEvents='';
         if(over){
           const w=getCurrentWeek();
@@ -2164,6 +2253,22 @@ function wireEvents(){
       td.addEventListener('contextmenu',e=>{ if(drag||timer) e.preventDefault(); });
     });
   })();
+  if(!historyViewId){
+    let lastNameTap = {rowId:null, t:0};
+    qa('tr[data-row] td.col-name').forEach(td=>{
+      td.addEventListener('click', ()=>{
+        if(Date.now()-lastDragEnd < 400) return;
+        const rowId = td.parentElement.dataset.row;
+        const now = Date.now();
+        if(lastNameTap.rowId===rowId && now-lastNameTap.t < 400){
+          lastNameTap = {rowId:null, t:0};
+          openDesconvocarModal(rowId);
+        } else {
+          lastNameTap = {rowId, t:now};
+        }
+      });
+    });
+  }
   qa('[data-toggle-arrived]').forEach(btn=>{
     btn.onclick = ()=>{
       const w = getCurrentWeek();
@@ -2219,13 +2324,10 @@ function wireEvents(){
     const tagVal = q('#quickAddTag').value;
     const isGK = tagVal==='gk';
     const isPro = tagVal==='pro';
-    if(!canAddToWeek(w, isGK)){
-      showToast(isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
-      return;
-    }
     let rp = roster().find(p=>p.name.toLowerCase()===name.toLowerCase());
     if(!rp){ rp = {id:uid(), name, isGK, isPro}; roster().push(rp); }
-    w.rows.push(makeRow(rp, {arrived:true}));
+    const res = addPlayerToSabado(w, rp, {arrived:true});
+    if(res==='espera') showToast(`${rp.name} queda en lista de espera 🕒`);
     saveData(); render();
     setTimeout(()=>{ const i=q('#quickAddInput'); if(i) i.focus(); }, 0);
   }
@@ -2248,17 +2350,14 @@ function wirePickerModal(w){
     qa('[data-pick]').forEach(el=>{
       el.onclick = ()=>{
         const id = el.dataset.pick;
-        const idx = w.rows.findIndex(r=>r.playerId===id);
-        if(idx>=0){
-          w.rows.splice(idx,1);
+        const rr = w.rows.find(r=>r.playerId===id);
+        if(rr){
+          removeSabadoRow(w, rr.rowId);
         } else {
           const rp = roster().find(p=>p.id===id);
           if(!rp) return;
-          if(!canAddToWeek(w, rp.isGK)){
-            showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
-            return;
-          }
-          w.rows.push(makeRow(rp));
+          const res = addPlayerToSabado(w, rp);
+          if(res==='espera') showToast(`${rp.name} queda en lista de espera 🕒`);
         }
         saveData();
         const list = q('#pickerList');
@@ -2379,7 +2478,7 @@ function wireRosterModal(){
         const pid = btn.dataset.rosterRemove;
         data().roster = roster().filter(x=>x.id!==pid);
         const w = getCurrentWeek();
-        if(w) w.rows = w.rows.filter(r=>r.playerId!==pid);
+        if(w){ w.rows = w.rows.filter(r=>r.playerId!==pid); promoteWaitlist(w); }
         saveData();
         refreshList();
       };
@@ -2389,17 +2488,14 @@ function wireRosterModal(){
         const w = getCurrentWeek();
         if(!w) return;
         const pid = btn.dataset.rosterConvene;
-        const idx = w.rows.findIndex(r=>r.playerId===pid);
-        if(idx>=0){
-          w.rows.splice(idx,1);
+        const rr = w.rows.find(r=>r.playerId===pid);
+        if(rr){
+          removeSabadoRow(w, rr.rowId);
         } else {
           const rp = roster().find(p=>p.id===pid);
           if(!rp) return;
-          if(!canAddToWeek(w, rp.isGK)){
-            showToast(rp.isGK ? `Máximo ${MAX_GK} arqueros en el partido` : `Máximo ${MAX_FIELD} jugadores en el partido`);
-            return;
-          }
-          w.rows.push(makeRow(rp));
+          const res = addPlayerToSabado(w, rp);
+          if(res==='espera') showToast(`${rp.name} queda en lista de espera 🕒`);
         }
         saveData();
         refreshList();
@@ -2447,7 +2543,7 @@ function wireRosterModal(){
     bulkBtn.onclick = ()=>{
       const w = getCurrentWeek();
       if(!w) return;
-      bulkQueue = w.rows.map(r=>roster().find(p=>p.id===r.playerId)).filter(p=>p && p.phone);
+      bulkQueue = w.rows.filter(r=>!r.waitlist).map(r=>roster().find(p=>p.id===r.playerId)).filter(p=>p && p.phone);
       bulkIndex = 0;
       renderBulkStep();
     };
@@ -3631,6 +3727,28 @@ function wireCampeonatoEvents(){
 function doFinishFecha(f){ f.phase='finalizado'; saveData(); render(); showToast('Fecha finalizada ✓'); }
 
 function doFinish(w){ w.phase='finalizado'; saveData(); render(); showToast('Partido finalizado ✓'); }
+
+function openDesconvocarModal(rowId){
+  const w = getCurrentWeek();
+  const r = w && w.rows.find(x=>x.rowId===rowId && !x.waitlist);
+  if(!r) return;
+  const tienePagos = !!r.arrived || (r.dio||0)>0;
+  const hayEspera = w.rows.some(x=>x.waitlist);
+  openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
+    <h3>¿Desconvocar a ${escapeHtml(r.name)}?</h3>
+    <p>${tienePagos ? 'Se perderán también su llegada y pago cargados en este partido. ' : ''}${hayEspera ? 'El primero de la lista de espera subirá a convocado.' : ''}</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-block" id="cancelDesconvocarBtn">Cancelar</button>
+      <button class="btn btn-danger btn-block" id="confirmDesconvocarBtn">Desconvocar</button>
+    </div>
+  </div></div>`);
+  document.getElementById('cancelDesconvocarBtn').onclick = closeModal;
+  document.getElementById('confirmDesconvocarBtn').onclick = ()=>{
+    const { promoted } = removeSabadoRow(w, rowId);
+    saveData(); closeModal(); render();
+    showToast(promoted.length ? `⬆ ${promoted[0].name} sube a convocados` : 'Jugador desconvocado');
+  };
+}
 
 function openModal(html){
   const div = document.createElement('div');
