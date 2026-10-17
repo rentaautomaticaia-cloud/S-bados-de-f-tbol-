@@ -774,8 +774,13 @@ function activeWeek(){
   return historyViewId ? weeksArr().find(x=>x.id===historyViewId) : getCurrentWeek();
 }
 
+function horaAhora(){
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
 function makeRow(rp, opts={}){
-  return { rowId: uid(), playerId: rp.id, name: rp.name, isGK: !!rp.isGK, isPro: !!rp.isPro, arrived: !!opts.arrived, won: true, dio:0, modo:'E', vueltoConfirmado:false };
+  return { rowId: uid(), playerId: rp.id, name: rp.name, isGK: !!rp.isGK, isPro: !!rp.isPro, arrived: !!opts.arrived, horaLlegada: opts.arrived ? horaAhora() : null, won: true, dio:0, modo:'E', vueltoConfirmado:false };
 }
 
 function lastModoPago(){
@@ -1536,7 +1541,8 @@ function renderSheet(w, cellsLocked, showAdd){
         <option value="pro">🥇🏆 Pro</option>
         <option value="gk">🥅 Arq.</option>
       </select>
-      <button class="btn btn-gold btn-xs" id="quickAddBtn">+</button>
+      <button class="btn btn-gold btn-xs" id="quickAddBtn" title="Agregar jugador" style="min-width:64px;">🤾🏻+</button>
+      <button class="btn btn-outline btn-xs" id="verLlegadasBtn" title="Ver hora de llegada">🕒 Ver hora llegada</button>
     </div>`;
   }
   html += `</div>`;
@@ -2289,6 +2295,7 @@ function wireEvents(){
       const w = getCurrentWeek();
       const r = w.rows.find(x=>x.rowId===btn.dataset.toggleArrived);
       r.arrived = !r.arrived;
+      r.horaLlegada = r.arrived ? horaAhora() : null;
       if(!r.arrived){ r.won=true; r.dio=0; r.modo='E'; r.vueltoConfirmado=false; }
       saveData(); render();
     };
@@ -2330,6 +2337,8 @@ function wireEvents(){
   });
 
   // quick add player (within current week + roster)
+  const verLlegadasBtn = q('#verLlegadasBtn');
+  if(verLlegadasBtn) verLlegadasBtn.onclick = openLlegadasModal;
   const quickAddBtn = q('#quickAddBtn');
   function quickAdd(){
     const w = getCurrentWeek();
@@ -3783,6 +3792,37 @@ function openQuitarEsperaModal(rowId){
     saveData(); closeModal(); render();
     showToast('Quitado de la lista de espera');
   };
+}
+
+function openLlegadasModal(){
+  const w = getCurrentWeek();
+  if(!w) return;
+  const conv = [
+    ...w.rows.filter(r=>!r.waitlist && r.isGK),
+    ...w.rows.filter(r=>!r.waitlist && !r.isGK && r.isPro),
+    ...w.rows.filter(r=>!r.waitlist && !r.isGK && !r.isPro)
+  ];
+  const llegaron = conv.filter(r=>r.arrived).length;
+  const filas = conv.map((r,i)=>{
+    const icon = r.isGK ? '🥅' : (r.isPro ? '🥇🏆' : '⚽🏃🏻');
+    const estado = r.arrived
+      ? `<span style="color:var(--win);font-weight:700;">✓ ${r.horaLlegada ? r.horaLlegada+' hs' : 'sin hora'}</span>`
+      : `<span style="color:var(--chalk-dim);opacity:.6;">— no llegó</span>`;
+    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 2px;border-bottom:1px solid var(--line);font-size:11px;">
+      <span style="width:18px;color:var(--chalk-dim);font-size:9px;">${i+1}.</span>
+      <span style="flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${icon} ${escapeHtml(r.name)}</span>
+      <span style="white-space:nowrap;">${estado}</span>
+    </div>`;
+  }).join('');
+  openModal(`<div class="modal-bg" id="modalBg"><div class="modal" style="max-height:80vh;display:flex;flex-direction:column;">
+    <h3 style="margin-bottom:2px;">🕒 Hora de llegada</h3>
+    <p style="margin:0 0 6px;font-size:11px;">Llegaron ${llegaron}/${conv.length} convocados</p>
+    <div style="overflow-y:auto;flex:1;min-height:0;">${filas || '<p>No hay convocados todavía.</p>'}</div>
+    <div class="modal-actions" style="margin-top:8px;">
+      <button class="btn btn-outline btn-block" id="cerrarLlegadasBtn">Cerrar</button>
+    </div>
+  </div></div>`);
+  document.getElementById('cerrarLlegadasBtn').onclick = ()=>{ closeModal(); render(); };
 }
 
 function openModal(html){
