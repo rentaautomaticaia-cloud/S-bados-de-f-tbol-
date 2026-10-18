@@ -2980,7 +2980,7 @@ function renderCampEstadisticaTab(){
   </div>`;
 
   if(matches.length>0){
-    const forma = matches; // todas las fechas, orden cronológico
+    const forma = matches.slice().reverse(); // último partido primero
     html += `<div class="eyebrow" style="margin:12px 0 6px;">Racha (todas las fechas)</div>
     <div style="display:flex; flex-wrap:wrap; gap:8px 6px; margin-bottom:4px;">`;
     forma.forEach(f=>{
@@ -3803,7 +3803,11 @@ function openLlegadasModal(){
     ...w.rows.filter(r=>!r.waitlist && !r.isGK && !r.isPro)
   ];
   const llegaron = conv.filter(r=>r.arrived).length;
-  const filas = conv.map((r,i)=>{
+  // llegados ordenados por hora de llegada (menor a mayor); los que no llegaron van al final
+  const porHora = conv.filter(r=>r.arrived).sort((a,b)=> (a.horaLlegada||'99:99').localeCompare(b.horaLlegada||'99:99'));
+  const pendientes = conv.filter(r=>!r.arrived);
+  const ordenados = [...porHora, ...pendientes];
+  const filas = ordenados.map((r,i)=>{
     const icon = r.isGK ? '🥅' : (r.isPro ? '🥇🏆' : '⚽🏃🏻');
     const estado = r.arrived
       ? `<span style="color:var(--win);font-weight:700;">✓ ${r.horaLlegada ? r.horaLlegada+' hs' : 'sin hora'}</span>`
