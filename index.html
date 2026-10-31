@@ -329,6 +329,8 @@
   tr.row-waitlist:hover td{ background:rgba(255,193,7,0.11); }
   tr.row-waitlist .rname{ color:#FFD54F; }
   tr.row-waitlist .rownum{ color:var(--amber); }
+  tr.row-waitlist .rname.wl-done{ text-decoration:line-through; text-decoration-thickness:2px; opacity:.6; }
+  tr.row-waitlist .wl-hora{ font-family:'JetBrains Mono'; font-size:9px; font-weight:700; color:var(--win); margin-left:4px; }
   tr.row-sep td, tr.row-sep:hover td{ padding:0; border-bottom:none; background:none; }
   .wl-sep{ display:flex; align-items:center; gap:6px; padding:6px 8px 4px; font-family:'JetBrains Mono'; font-size:9px; font-weight:700; letter-spacing:0.8px; color:var(--amber); text-transform:uppercase; text-shadow:0 0 10px rgba(255,193,7,0.35); }
   .wl-sep::before, .wl-sep::after{ content:''; flex:1; border-top:1px dashed rgba(255,193,7,0.5); }
@@ -552,6 +554,7 @@ function promoteWaitlist(w, at=null){
       if(i<0) break;
       const [p] = w.rows.splice(i,1);
       p.waitlist = false;
+      if(p.llegoEspera){ p.arrived = true; p.horaLlegada = p.horaEspera; p.dio = p.plataEspera||0; }
       const pos = (at!==null && at<=w.rows.length) ? at : firstWaitlistIdx(w);
       w.rows.splice(pos, 0, p);
       promoted.push(p);
@@ -992,8 +995,8 @@ const MODOS_PAGO = {
       if(r.isPro) return r.won===true ? 0 : c.porPerdedor;   // pro: no paga cancha, sí apuesta si pierde
       return r.won===true ? c.porJugador : (c.porJugador + c.porPerdedor); // normal
     },
-    derivadoCancha:  v => v.normalArrivedCount>0 ? `$${fmt(v.porJugador)} c/u · ${v.normalArrivedCount} normales` : 'Sin normales aún',
-    derivadoApuesta: v => v.losersCount>0 ? `$${fmt(v.porPerdedor)} c/u · ${v.losersCount} perd.` : 'Sin perdedores aún'
+    derivadoCancha:  v => v.normalArrivedCount>0 ? `$${fmt(v.porJugador)} c/u · ${v.normalArrivedCount} Pagan Cancha` : 'Pagan Cancha',
+    derivadoApuesta: v => v.losersCount>0 ? `$${fmt(v.porPerdedor)} c/u · ${v.losersCount} perd.` : 'Pagan Gatorade'
   },
   // Modo 2: se apuesta todo (cancha + apuesta). Solo los perdedores pagan el total entre todos ellos.
   perdedores: {
@@ -1487,13 +1490,14 @@ function renderSheet(w, cellsLocked, showAdd){
   // Fila de jugador en espera: sin llegada, pago ni modo; solo informativa
   function waitRowHtml(r, num){
     const icon = r.isGK ? '🥅' : (r.isPro ? '🥇🏆' : '⚽🏃🏻');
+    const ll = !!r.llegoEspera;
     return `<tr class="row-waitlist" data-wait-row="${r.rowId}">
       <td class="col-num sticky-col"><span class="rownum">E${num}.</span></td>
-      <td class="col-name sticky-col"><span class="rname">${icon} ${escapeHtml(r.name)}</span></td>
-      <td class="col-ll"><button class="cell-btn" disabled></button></td>
+      <td class="col-name sticky-col"><span class="rname ${ll?'wl-done':''}">${icon} ${escapeHtml(r.name)}</span>${ll && r.horaEspera ? ` <span class="wl-hora">${r.horaEspera} hs</span>` : ''}</td>
+      <td class="col-ll"><button class="cell-btn ${ll?'ll-on':''}" data-toggle-wait-arrived="${r.rowId}" ${cellsLocked?'disabled':''}>${ll?'✓':''}</button></td>
       <td class="col-gp"><button class="cell-btn" disabled>—</button></td>
       <td class="col-pago"><span class="pago-val">—</span></td>
-      <td class="col-dio"><input type="number" class="dio-input" disabled placeholder="0"></td>
+      <td class="col-dio"><input type="number" min="0" step="0.5" class="dio-input" data-wait-dio="${r.rowId}" value="${r.plataEspera?fmtMiles(r.plataEspera):''}" placeholder="0" ${cellsLocked||!ll?'disabled':''} style="${r.plataEspera?'text-decoration:line-through;opacity:.6;':''}"></td>
       <td class="col-vta"><span class="vta-val pend">—</span></td>
       <td class="col-md"><button class="cell-btn" disabled>—</button></td>
     </tr>`;
@@ -2297,6 +2301,24 @@ function wireEvents(){
       r.arrived = !r.arrived;
       r.horaLlegada = r.arrived ? horaAhora() : null;
       if(!r.arrived){ r.won=true; r.dio=0; r.modo='E'; r.vueltoConfirmado=false; }
+      saveData(); render();
+    };
+  });
+  qa('[data-toggle-wait-arrived]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const w = getCurrentWeek();
+      const r = w.rows.find(x=>x.rowId===btn.dataset.toggleWaitArrived);
+      r.llegoEspera = !r.llegoEspera;
+      r.horaEspera = r.llegoEspera ? horaAhora() : null;
+      if(!r.llegoEspera) r.plataEspera = 0;
+      saveData(); render();
+    };
+  });
+  qa('[data-wait-dio]').forEach(inp=>{
+    inp.onchange = ()=>{
+      const w = getCurrentWeek();
+      const r = w.rows.find(x=>x.rowId===inp.dataset.waitDio);
+      r.plataEspera = Math.round((parseFloat(inp.value)||0)*1000);
       saveData(); render();
     };
   });
