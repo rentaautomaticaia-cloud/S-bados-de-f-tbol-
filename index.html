@@ -330,6 +330,7 @@
   tr.row-waitlist .rname{ color:#FFD54F; }
   tr.row-waitlist .rownum{ color:var(--amber); }
   tr.row-waitlist .rname.wl-done{ text-decoration:line-through; text-decoration-thickness:2px; opacity:.6; }
+  tr.row-waitlist .wl-x{ background:none; border:none; color:var(--chalk-dim); font-size:10px; padding:0 2px; margin-left:4px; cursor:pointer; }
   tr.row-waitlist .wl-hora{ font-family:'JetBrains Mono'; font-size:9px; font-weight:700; color:var(--win); margin-left:4px; }
   tr.row-sep td, tr.row-sep:hover td{ padding:0; border-bottom:none; background:none; }
   .wl-sep{ display:flex; align-items:center; gap:6px; padding:6px 8px 4px; font-family:'JetBrains Mono'; font-size:9px; font-weight:700; letter-spacing:0.8px; color:var(--amber); text-transform:uppercase; text-shadow:0 0 10px rgba(255,193,7,0.35); }
@@ -545,31 +546,24 @@ function addPlayerToSabado(w, rp, opts={}){
   else w.rows.splice(firstWaitlistIdx(w), 0, row);
   return wait ? 'espera' : 'convocado';
 }
-// Sube a convocados a los primeros en espera mientras haya cupo. `at` = lugar que ocupa el convocado que se fue.
-function promoteWaitlist(w, at=null){
-  const promoted = [];
-  [true,false].forEach(isGK=>{
-    while(hasSpaceFor(w, isGK)){
-      const i = w.rows.findIndex(r=>r.waitlist && r.isGK===isGK);
-      if(i<0) break;
-      const [p] = w.rows.splice(i,1);
-      p.waitlist = false;
-      if(p.llegoEspera){ p.arrived = true; p.horaLlegada = p.horaEspera; p.dio = p.plataEspera||0; }
-      const pos = (at!==null && at<=w.rows.length) ? at : firstWaitlistIdx(w);
-      w.rows.splice(pos, 0, p);
-      promoted.push(p);
-      at = null;
-    }
-  });
-  return promoted;
-}
-// Quita una fila. Si era convocado, el primero de espera de su grupo ocupa su lugar.
+// Quita una fila. NO sube a nadie de la lista de espera: el cupo queda libre hasta que se promueva a mano.
 function removeSabadoRow(w, rowId){
   const idx = w.rows.findIndex(r=>r.rowId===rowId);
   if(idx<0) return { removed:null, promoted:[] };
   const [removed] = w.rows.splice(idx,1);
-  const promoted = removed.waitlist ? [] : promoteWaitlist(w, idx);
-  return { removed, promoted };
+  return { removed, promoted:[] };
+}
+// Pasa manualmente un jugador de espera a convocados (al final de los convocados).
+// Devuelve 'ok', 'sin-cupo' o 'no-existe'.
+function promoteWaitRow(w, rowId){
+  const r = w.rows.find(x=>x.rowId===rowId && x.waitlist);
+  if(!r) return 'no-existe';
+  if(!hasSpaceFor(w, !!r.isGK)) return 'sin-cupo';
+  w.rows.splice(w.rows.indexOf(r), 1);
+  r.waitlist = false;
+  if(r.llegoEspera){ r.arrived = true; r.horaLlegada = r.horaEspera; r.dio = r.plataEspera||0; }
+  w.rows.splice(firstWaitlistIdx(w), 0, r);
+  return 'ok';
 }
 
 const fmt = n => (Math.round(n||0)).toLocaleString('es-CO');
@@ -1406,7 +1400,6 @@ function renderSabado(){
 
   const cellsLocked = w.phase !== 'jugando';
   const showAdd = !readOnly;
-  if(!readOnly && w.rows.some(r=>r.waitlist) && promoteWaitlist(w).length) saveData();
   const arrived = w.rows.filter(r=>r.arrived);
 
   if(w.phase==='jugando' && arrived.length>0){
@@ -1493,7 +1486,7 @@ function renderSheet(w, cellsLocked, showAdd){
     const ll = !!r.llegoEspera;
     return `<tr class="row-waitlist" data-wait-row="${r.rowId}">
       <td class="col-num sticky-col"><span class="rownum">E${num}.</span></td>
-      <td class="col-name sticky-col"><span class="rname ${ll?'wl-done':''}">${icon} ${escapeHtml(r.name)}</span>${ll && r.horaEspera ? ` <span class="wl-hora">${r.horaEspera} hs</span>` : ''}</td>
+      <td class="col-name sticky-col"><span class="rname ${ll?'wl-done':''}">${icon} ${escapeHtml(r.name)}</span>${ll && r.horaEspera ? ` <span class="wl-hora">${r.horaEspera} hs</span>` : ''}<button class="wl-x" data-wait-quit="${r.rowId}" title="Quitar de la lista de espera">✕</button></td>
       <td class="col-ll"><button class="cell-btn ${ll?'ll-on':''}" data-toggle-wait-arrived="${r.rowId}" ${cellsLocked?'disabled':''}>${ll?'✓':''}</button></td>
       <td class="col-gp"><button class="cell-btn" disabled>—</button></td>
       <td class="col-pago"><span class="pago-val">—</span></td>
@@ -1530,7 +1523,7 @@ function renderSheet(w, cellsLocked, showAdd){
   }
   for(let i=jugadorConsecutivo;i<MAX_FIELD;i++) html += emptyRow(i+1, 'Libre');
   if(waitRows.length){
-    html += `<tr class="row-sep"><td colspan="8"><div class="wl-sep">🕒 LISTA DE ESPERA</div></td></tr>`;
+    html += `<tr class="row-sep"><td colspan="8"><div class="wl-sep">🕒 LISTA DE ESPERA · doble toque para convocar</div></td></tr>`;
     waitRows.forEach((r,i)=> html += waitRowHtml(r, i+1));
   }
 
@@ -2216,7 +2209,7 @@ function wireEvents(){
     const w0 = getCurrentWeek();
     if(!w0 || historyViewId) return;
     const grpOf = r=> w=>w.rows.filter(x=>r.isGK ? x.isGK : (!x.isGK && !!x.isPro===!!r.isPro));
-    qa('tr[data-row] td.col-name').forEach(td=>{
+    qa('tr[data-row] td.col-name, tr[data-wait-row] td.col-name').forEach(td=>{
       const tr = td.parentElement;
       let timer=null, drag=false, sx=0, sy=0, over=null;
       const clear=()=>{ clearTimeout(timer); timer=null; };
@@ -2227,7 +2220,7 @@ function wireEvents(){
         tr.style.transform=`translateY(${y-sy}px)`;
         tr.style.pointerEvents='none';
         const el=document.elementFromPoint(x,y);
-        const t=el&&el.closest('tr[data-row]');
+        const t=el&&el.closest('tr[data-row], tr[data-wait-row]');
         if(over) over.classList.remove('drop-target');
         over=(t&&t!==tr)?t:null;
         if(over) over.classList.add('drop-target');
@@ -2240,12 +2233,15 @@ function wireEvents(){
         tr.classList.remove('dragging'); tr.style.transform=''; tr.style.pointerEvents='';
         if(over){
           const w=getCurrentWeek();
-          const a=w.rows.find(r=>r.rowId===tr.dataset.row), b=w.rows.find(r=>r.rowId===over.dataset.row);
-          if(a&&b&&a.isGK===b.isGK&&!!a.isPro===!!b.isPro){
+          const rid=el=>el.dataset.row||el.dataset.waitRow;
+          const a=w.rows.find(r=>r.rowId===rid(tr)), b=w.rows.find(r=>r.rowId===rid(over));
+          const sameKind = a && b && !!a.waitlist===!!b.waitlist;
+          const sameGroup = a && b && (a.waitlist ? a.isGK===b.isGK : (a.isGK===b.isGK && !!a.isPro===!!b.isPro));
+          if(sameKind && sameGroup){
             const ia=w.rows.indexOf(a); w.rows.splice(ia,1);
             w.rows.splice(w.rows.indexOf(b)+(ia<w.rows.indexOf(b)+1?1:0),0,a);
             saveData();
-          } else if(a&&b) showToast('Solo puedes mover dentro del mismo grupo');
+          } else if(a&&b) showToast(sameKind ? 'Solo puedes mover dentro del mismo grupo' : 'No mezcles convocados con lista de espera');
         }
         render();
       };
@@ -2281,17 +2277,21 @@ function wireEvents(){
   if(!historyViewId){
     let lastWaitTap = {rowId:null, t:0};
     qa('tr[data-wait-row] td.col-name').forEach(td=>{
-      td.addEventListener('click', ()=>{
+      td.addEventListener('click', (e)=>{
         if(Date.now()-lastDragEnd < 400) return;
+        if(e.target.closest('[data-wait-quit]')) return;
         const rowId = td.parentElement.dataset.waitRow;
         const now = Date.now();
         if(lastWaitTap.rowId===rowId && now-lastWaitTap.t < 400){
           lastWaitTap = {rowId:null, t:0};
-          openQuitarEsperaModal(rowId);
+          convocarDesdeEspera(rowId);
         } else {
           lastWaitTap = {rowId, t:now};
         }
       });
+    });
+    qa('[data-wait-quit]').forEach(btn=>{
+      btn.onclick = (e)=>{ e.stopPropagation(); openQuitarEsperaModal(btn.dataset.waitQuit); };
     });
   }
   qa('[data-toggle-arrived]').forEach(btn=>{
@@ -2524,7 +2524,7 @@ function wireRosterModal(){
         const pid = btn.dataset.rosterRemove;
         data().roster = roster().filter(x=>x.id!==pid);
         const w = getCurrentWeek();
-        if(w){ w.rows = w.rows.filter(r=>r.playerId!==pid); promoteWaitlist(w); }
+        if(w){ w.rows = w.rows.filter(r=>r.playerId!==pid); }
         saveData();
         refreshList();
       };
@@ -3782,7 +3782,7 @@ function openDesconvocarModal(rowId){
   const hayEspera = w.rows.some(x=>x.waitlist);
   openModal(`<div class="modal-bg" id="modalBg"><div class="modal">
     <h3>¿Desconvocar a ${escapeHtml(r.name)}?</h3>
-    <p>${tienePagos ? 'Se perderán también su llegada y pago cargados en este partido. ' : ''}${hayEspera ? 'El primero de la lista de espera subirá a convocado.' : ''}</p>
+    <p>${tienePagos ? 'Se perderán también su llegada y pago cargados en este partido. ' : ''}${hayEspera ? 'Su lugar quedará libre; la lista de espera no sube sola.' : ''}</p>
     <div class="modal-actions">
       <button class="btn btn-outline btn-block" id="cancelDesconvocarBtn">Cancelar</button>
       <button class="btn btn-danger btn-block" id="confirmDesconvocarBtn">Desconvocar</button>
@@ -3790,9 +3790,9 @@ function openDesconvocarModal(rowId){
   </div></div>`);
   document.getElementById('cancelDesconvocarBtn').onclick = closeModal;
   document.getElementById('confirmDesconvocarBtn').onclick = ()=>{
-    const { promoted } = removeSabadoRow(w, rowId);
+    removeSabadoRow(w, rowId);
     saveData(); closeModal(); render();
-    showToast(promoted.length ? `⬆ ${promoted[0].name} sube a convocados` : 'Jugador desconvocado');
+    showToast('Jugador desconvocado');
   };
 }
 
@@ -3814,6 +3814,20 @@ function openQuitarEsperaModal(rowId){
     saveData(); closeModal(); render();
     showToast('Quitado de la lista de espera');
   };
+}
+
+function convocarDesdeEspera(rowId){
+  const w = getCurrentWeek();
+  if(!w) return;
+  const r = w.rows.find(x=>x.rowId===rowId && x.waitlist);
+  if(!r) return;
+  const nombre = r.name;
+  if(promoteWaitRow(w, rowId)==='sin-cupo'){
+    showToast(r.isGK ? 'No hay cupo de arqueros. Desconvoca a alguien primero' : 'No hay cupo de jugadores. Desconvoca a alguien primero');
+    return;
+  }
+  saveData(); render();
+  showToast(`⬆ ${nombre} pasa a convocados`);
 }
 
 function openLlegadasModal(){
