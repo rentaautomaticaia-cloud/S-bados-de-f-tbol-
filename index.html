@@ -868,9 +868,57 @@ function campPlayerInscripcionInstallment(){
   return roundUpTo(quota / cfg.numFechas, cfg.redondeo);
 }
 
-// Insc: cuota fija por fecha (no depende de la fecha en sí, es la misma para todo el plantel)
-function fechaInscripcionPorJugador(f){
-  return campPlayerInscripcionInstallment();
+// Cuánto ha aportado a inscripción un jugador en las fechas ANTERIORES a f.
+// En cada fecha, lo primero que se cobra es el arbitraje; lo que sobre cuenta como inscripción
+// (incluye abonos adelantados cuando alguien da de más).
+function playerInscPagadaAntes(playerId, f){
+  const fechas = campFechas();
+  const idx = fechas.findIndex(x=>x.id===f.id);
+  let total = 0;
+  for(let i=0; i<idx; i++){
+    const fi = fechas[i];
+    const arbPer = fechaArbitrajePorJugador(fi);
+    const row = fi.rows.find(x=>x.playerId===playerId && x.arrived && !x.isGK);
+    if(!row) continue;
+    total += Math.max(0, (row.dio||0) - arbPer);
+  }
+  return total;
+}
+// Inscripción recaudada (de todo el plantel) en las fechas ANTERIORES a f.
+function campInscRecaudadaAntes(f){
+  const fechas = campFechas();
+  const idx = fechas.findIndex(x=>x.id===f.id);
+  let total = 0;
+  for(let i=0; i<idx; i++){
+    const fi = fechas[i];
+    const arbPer = fechaArbitrajePorJugador(fi);
+    fi.rows.forEach(row=>{
+      if(!row.arrived || row.isGK) return;
+      total += Math.max(0, (row.dio||0) - arbPer);
+    });
+  }
+  return total;
+}
+// Insc: lo que le corresponde pagar a ESTE jugador en ESTA fecha.
+// - Normalmente es la cuota por fecha.
+// - Si ya pagó (o abonó por adelantado) toda su inscripción, es $0: solo paga arbitraje.
+// - Nunca se le cobra más de lo que le falta para completar su cuota total.
+// - En la última fecha del campeonato se cobra todo lo que aún le falte.
+function fechaInscripcionPorJugador(f, playerId){
+  const cfg = campConfig();
+  if(!cfg) return 0;
+  const quota = campPlayerInscripcionQuota();
+  if(quota<=0) return 0;
+  const faltante = Math.max(0, quota - playerInscPagadaAntes(playerId, f));
+  if(faltante<=0) return 0;
+  const installment = campPlayerInscripcionInstallment();
+  const esUltima = (fechaIndex(f)+1) >= cfg.numFechas;
+  let cobro = esUltima ? faltante : Math.min(installment, faltante);
+  // Si entre todos ya se completó la inscripción total del campeonato (porque otros dieron de más),
+  // a nadie se le cobra más inscripción: solo arbitraje.
+  const faltanteGlobal = Math.max(0, cfg.inscripcionTotal - campInscRecaudadaAntes(f));
+  cobro = Math.min(cobro, faltanteGlobal);
+  return Math.round(cobro);
 }
 // Arbitraje: se sigue dividiendo solo entre quienes llegaron ESE día. No lleva registro
 // histórico -- se recoge y se paga el mismo día, punto.
@@ -886,7 +934,7 @@ function fechaArbitrajePorJugador(f){
 function rowDebido(r, f){
   if(!r.arrived || r.isGK) return { arbitraje:0, inscripcion:0, total:0 };
   const arb = fechaArbitrajePorJugador(f);
-  const insc = fechaInscripcionPorJugador(f);
+  const insc = fechaInscripcionPorJugador(f, r.playerId);
   return { arbitraje: arb, inscripcion: insc, total: arb+insc };
 }
 function rowSaldo(r, f){
@@ -960,6 +1008,7 @@ function campTotals(){
   const quota = campPlayerInscripcionQuota();
   const installment = campPlayerInscripcionInstallment();
 
+  const inscCompleta = cfg ? (inscripcionRecaudadaTotal >= cfg.inscripcionTotal) : false;
   Object.values(players).forEach(pl=>{
     if(pl.isGK){ pl.leToca = 0; pl.debeInsc = 0; return; }
     if(pl.archived){
@@ -971,9 +1020,12 @@ function campTotals(){
     // (inscripción total del campeonato repartida entre el plantel de campo ACTIVO).
     pl.leToca = quota;
     pl.debeInsc = pl.leToca - pl.insc;
+    // Si la inscripción total ya está completa, lo que a este jugador le falta ya lo cubrieron otros
+    pl.cubierto = (inscCompleta && pl.debeInsc > 0);
   });
 
   const inscripcionTotal = cfg ? cfg.inscripcionTotal : 0;
+  const cobradoDeMas = Math.max(0, inscripcionRecaudadaTotal - inscripcionTotal);
   const inscripcionPendienteTotal = Math.max(0, inscripcionTotal - inscripcionRecaudadaTotal);
   const fechasJugadas = fechas.filter(f=>f.phase==='finalizado').length;
   const fechasRestantes = cfg ? Math.max(0, cfg.numFechas - fechasJugadas) : 0;
@@ -982,7 +1034,7 @@ function campTotals(){
 
   return {
     players: Object.values(players),
-    excedente, inscripcionRecaudadaTotal, inscripcionPendienteTotal,
+    excedente, cobradoDeMas, inscCompleta, inscripcionRecaudadaTotal, inscripcionPendienteTotal,
     inscripcionTotal, fechasJugadas, fechasRestantes,
     cuotaPorJugador: quota, cuotaPorFecha: installment, numJugadoresCampo
   };
@@ -2787,7 +2839,7 @@ function campConfigSummaryBar(cfg){
     <h2 style="font-size:12px;">Config. del campeonato <button class="btn btn-outline btn-xs" id="editCampConfigBtn">⚙️ Editar</button></h2>
     <div style="font-size:11.5px; color:var(--chalk-dim); line-height:1.7;">
       Arbitraje: $${fmt(cfg.arbitraje)} por fecha, entre quienes llegaron ese día (no lleva registro)<br>
-      Inscripción: $${fmt(cfg.inscripcionTotal)} repartida entre los ${n} jugadores de campo del plantel → $${fmt(quota)} c/u en ${cfg.numFechas} fechas ($${fmt(installment)} por fecha)<br>
+      Inscripción: $${fmt(cfg.inscripcionTotal)} repartida entre los ${n} jugadores de campo del plantel → $${fmt(quota)} c/u en ${cfg.numFechas} fechas ($${fmt(installment)} por fecha; si ya pagó su cuota completa, solo paga arbitraje)<br>
       Redondeo: múltiplos de $${fmt(cfg.redondeo)}
     </div>
   </div>`;
@@ -2967,7 +3019,11 @@ function renderCampFinanzas(){
     <div class="stat-chip"><div class="slabel">Fechas jugadas</div><div class="sval">${t.fechasJugadas}</div></div>
     <div class="stat-chip"><div class="slabel">Fechas restantes</div><div class="sval">${t.fechasRestantes}</div></div>
     <div class="stat-chip gold"><div class="slabel">Excedente redondeo</div><div class="sval">$${fmt(t.excedente)}</div></div>
+    ${t.cobradoDeMas>0 ? `<div class="stat-chip win"><div class="slabel">Cobrado de más</div><div class="sval">$${fmt(t.cobradoDeMas)}</div></div>` : ''}
   </div>`;
+  if(t.inscCompleta){
+    html += `<div style="font-size:11px; color:var(--chalk-dim); margin:6px 0;">✅ La inscripción total ya está completa. Nadie paga más inscripción, solo arbitraje. Quien aparece como "cubierto" quedó debiendo, pero lo cubrieron otros que dieron de más.</div>`;
+  }
 
 
   html += `<div class="eyebrow" style="margin:12px 0 6px;">Por jugador · inscripción: cuánto le toca, cuánto ha dado y cuánto le falta</div>`;
@@ -2986,8 +3042,8 @@ function renderCampFinanzas(){
   });
   sortedPlayers.forEach(p=>{
     const falta = p.debeInsc; // positivo = debe, negativo = a favor
-    const faltaColor = falta>0 ? 'var(--lose)' : falta<0 ? 'var(--win)' : 'var(--chalk-dim)';
-    const faltaTxt = p.archived ? '—' : (falta>0 ? '-$'+fmt(falta) : falta<0 ? '+$'+fmt(-falta) : '$0');
+    const faltaColor = p.cubierto ? 'var(--chalk-dim)' : falta>0 ? 'var(--lose)' : falta<0 ? 'var(--win)' : 'var(--chalk-dim)';
+    const faltaTxt = p.archived ? '—' : (p.cubierto ? 'cubierto' : falta>0 ? '-$'+fmt(falta) : falta<0 ? '+$'+fmt(-falta) : '$0');
     const sinFechas = p.fechasJugadas===0;
     html += `<tr class="${p.isGK?'row-gk':''}" style="${p.archived?'opacity:0.55;':''}">
       <td class="col-name sticky-col"><span class="rname">${p.isGK?'🥅 ':'⚽ '}${escapeHtml(p.name)}${p.archived?' <span style="color:var(--chalk-dim);font-weight:400;font-size:9px;">(archivado)</span>':(sinFechas && !p.isGK?' <span style="color:var(--chalk-dim);font-weight:400;font-size:9px;">(no ha pagado)</span>':'')}</span></td>
